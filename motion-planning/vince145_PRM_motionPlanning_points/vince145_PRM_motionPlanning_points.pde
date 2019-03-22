@@ -3,8 +3,33 @@
 //
 //
 //
+//
+// Ray - Sphere intersection code modified from
+// http://kylehalladay.com/blog/tutorial/math/2013/12/24/Ray-Sphere-Intersection.html
+//
+// Dijikstra's Algorithm code modified from
+// https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
+// pseudocode
+//
 //////////////////////////////////////////////////////////////////
 // TODO: 
+//
+//   - Figure out error with 
+/*
+          Vector d = new Vector(randomX - obstacles.get(k).getX(), randomY - obstacles.get(k).getY());
+          float dist = d.magnitude();
+          //dist = dist + circleBoySize;
+          if (dist < obstacles.get(k).getSize() * 0.5) {
+            milestoneValid = false;
+          }
+*/
+//      with "dist = dist + circleBoySize;" causing
+//      the if statement to always be true causing points to be
+//      generated inside of obstacles when
+//      the intended functionality is to have points not generate within
+//      circleBoy's radius away from obstacle's edges so circleBoy
+//      does not overlap half of it's drawn circle on top of obstacles
+//      by chance of points being generated too close to the obstacles.
 //
 //   - 
 //
@@ -15,14 +40,15 @@ import java.util.Collections;
 boolean sampleRandomTiles = true;
 boolean continuousPathFinding = false;
 boolean debug = false;
-boolean extraObstacles = false;
+boolean extraObstacles = true;
 boolean middleObstacle = true;
-boolean rayCollision = false;
-boolean drawAllPaths = true;
+boolean rayCollision = true;
+boolean drawAllPaths = false;
+boolean drawAllPathsOnTop = false;
 
 float boardSize = 400;
-float edgeMaxDistance = boardSize/10; // boardSize/10
-int numberOfSampledPoints = 1000;
+float edgeMaxDistance = boardSize/8; // boardSize/10
+int numberOfSampledPoints = 1500;
 
 float w = 800;
 float h = 600;
@@ -58,16 +84,49 @@ void draw() {
 
 void handleInput(char input) {
   switch (input) {
+              // Resets board
     case ' ': board = new Environment(w*0.5, h*0.5, boardSize);
               board.PRM();
               break;
+              // Resets board and turns only middle obstacle on
     case '1': middleObstacle = true;
               extraObstacles = false;
               board = new Environment(w*0.5, h*0.5, boardSize);
               board.PRM();
               break;
+              // Resets board and turns middle obstacle on
+              // and turns extra obstacles on
     case '2': middleObstacle = true;
               extraObstacles = true;
+              board = new Environment(w*0.5, h*0.5, boardSize);
+              board.PRM();
+              break;
+              // Resets board and turns on or off 
+              // drawing all edges between sampled points
+    case '3': drawAllPaths = !drawAllPaths;
+              board = new Environment(w*0.5, h*0.5, boardSize);
+              board.PRM();
+              break;
+              // Resets board and turns on or off 
+              // drawing all edges between sampled points
+              // above the obstacles and circleboy.
+    case '4': drawAllPathsOnTop = !drawAllPathsOnTop;
+              board = new Environment(w*0.5, h*0.5, boardSize);
+              board.PRM();
+              break;
+    case 'w': numberOfSampledPoints += 100;
+              board = new Environment(w*0.5, h*0.5, boardSize);
+              board.PRM();
+              break;
+    case 's': numberOfSampledPoints -= 100;
+              board = new Environment(w*0.5, h*0.5, boardSize);
+              board.PRM();
+              break;
+    case 'a': edgeMaxDistance *= 0.9;
+              board = new Environment(w*0.5, h*0.5, boardSize);
+              board.PRM();
+              break;
+    case 'd': edgeMaxDistance *= 1.1;
               board = new Environment(w*0.5, h*0.5, boardSize);
               board.PRM();
               break;
@@ -130,6 +189,7 @@ public class Vector {
       y = y/(mag);
     }
   }
+  
   // Calculates distance from point startV to .this point.
   Vector d(Vector startV) {
     Vector distanceVector = new Vector(x-startV.x, y-startV.y);
@@ -140,14 +200,7 @@ public class Vector {
     float dotProduct = (x * startV.x) + (y * startV.y);
     return dotProduct;
   }
-  /*
-  Vector crossProd(Vector b) {
-    Vector resultVector = new Vector((y)*(b.z)-(z)*(b.y),
-                                     -1*((x)*(b.z)-(z)*(b.x)),
-                                     (x)*(b.y)-(y)*(b.x));
-    return resultVector;
-  }
-  */
+  
   void reset() {
     x = 0;
     y = 0;
@@ -187,6 +240,7 @@ class Environment {
     }
     
     // Setup default tiles
+    // Tiles are used to draw the goal / starting area for circleboy
     int tileN = (int) size/10;
     tiles = new Tile[tileN][tileN];
     for (int i = 0; i < 20; i++) {
@@ -221,6 +275,7 @@ class Environment {
     fill(100,100,100);
     square(centerX-(size*0.5), centerY-(size*0.5), size);
     stroke(150,150,150);
+    
     // Draw base layer of tiles
     /*
     for (int i = 0; i < 20; i++) {
@@ -232,6 +287,10 @@ class Environment {
     
     // Draws all edges for testing purposes if turned on
     if (drawAllPaths) {
+      pushMatrix();
+      if (drawAllPathsOnTop) {
+        translate(0,0,10);
+      }
       stroke(200, 15);
       for (int i = 0; i < dEdges.size(); i++) {
         float Ax = dEdges.get(i).getA().getX();
@@ -240,6 +299,7 @@ class Environment {
         float By = dEdges.get(i).getB().getY();
         line (Ax, Ay, Bx, By);
       }
+      popMatrix();
     }
     
     // Draw special tiles on top of base layer
@@ -292,7 +352,8 @@ class Environment {
     }
     popMatrix();
     strokeWeight(1);
-    // Outline of Environment
+    
+    // Red outline of Environment
     stroke(255,0,0);
     line(centerX-(size*0.5), centerY-(size*0.5), centerX+(size*0.5), centerY-(size*0.5));
     line(centerX+(size*0.5), centerY-(size*0.5), centerX+(size*0.5), centerY+(size*0.5));
@@ -308,7 +369,9 @@ class Environment {
     popMatrix();
     
     text("Frame rate: " + int(frameRate), centerX-(size*0.5), centerY+(size*0.5)+(size*0.05));
-    
+    text("Number of Sampled Points: " + numberOfSampledPoints, centerX-(size*0.5), centerY+(size*0.5)+(size*0.10));
+    text("Max Edge Distance: " + edgeMaxDistance, centerX-(size*0.5), centerY+(size*0.5)+(size*0.15));
+    text("Circle Boy Radius: " + circleBoy.getSize(), centerX-(size*0.5), centerY+(size*0.5)+(size*0.20));
 
   }
   
@@ -326,7 +389,6 @@ class Environment {
     ArrayList<Milestone> milestones = new ArrayList<Milestone>();
     ArrayList<Edge> paths = new ArrayList<Edge>();
     
-    
     // Sample random points
     for (int i = 0; i < numberOfSampledPoints; i++) {
       // Randomly sample configurations
@@ -334,11 +396,14 @@ class Environment {
       float randomY =  random(centerY - size * 0.5, centerY + size * 0.5);
       // Test configurations for collisions
       if (obstacles.size() > 0) {
+        
         boolean milestoneValid = true;
+        //float circleBoySize = circleBoy.getSize();
         for (int k = 0; k < obstacles.size() && milestoneValid; k++) {
-          float dist = abs((randomX - obstacles.get(k).getX()));
-          dist += abs((randomY - obstacles.get(k).getY()));
-          if (dist < obstacles.get(k).getSize() * 0.7) {
+          Vector d = new Vector(randomX - obstacles.get(k).getX(), randomY - obstacles.get(k).getY());
+          float dist = d.magnitude();
+          //dist = dist + circleBoySize;
+          if (dist < obstacles.get(k).getSize() * 0.5) {
             milestoneValid = false;
           }
         }
@@ -352,10 +417,6 @@ class Environment {
     milestones.add(new Milestone(circleBoy.getX(), circleBoy.getY(), 0));
     milestones.add(new Milestone(centerX-(size*0.5)+(19*size/20)+size/40, centerY-(size*0.5)+(0*size/20)+size/40, 1));
     
-    if (debug) {
-      println("milestones = " + milestones.size());
-    }
-    
     // Straight lines connect neighboring milestones
     for (int i = 0; i < milestones.size(); i++) {
       for (int j = 0; j < milestones.size(); j++) {
@@ -363,7 +424,7 @@ class Environment {
         dist += abs((milestones.get(j).getY() - milestones.get(i).getY()));
         if (dist < edgeMaxDistance && dist > 0) {
           if (rayCollision) {
-            //paths.add(new Edge(milestones.get(i), milestones.get(j), dist));
+            
             // Ray - sphere intersection checks
             boolean addEdge = true;
             for (int k = 0; k < obstacles.size(); k++) {
@@ -371,22 +432,19 @@ class Environment {
               // B = end tile
               // C = obstacle center point
               // r = sphere radius
-              Vector tileA = new Vector(milestones.get(i).getX(), milestones.get(i).getY());
-              Vector tileB = new Vector(milestones.get(j).getX(), milestones.get(j).getY());
-              Vector edgeDirection = tileB.d(tileA);
-              float edgeDirectionMag = edgeDirection.magnitude();
-              edgeDirection.divide(edgeDirectionMag);
+              Vector pointA = new Vector(milestones.get(i).getX(), milestones.get(i).getY());
+              Vector pointB = new Vector(milestones.get(j).getX(), milestones.get(j).getY());
+              Vector edgeDirection = pointB.d(pointA);
+              edgeDirection.normalizeV();
               Vector obstacleCenter = new Vector(obstacles.get(k).getX(), obstacles.get(k).getY());
-              Vector oc = tileA.d(obstacleCenter);
-              edgeDirection.scaler(2);
-              float a = 1;
-              float b = edgeDirection.dotProd(oc);
-              float c = oc.dotProd(oc) - pow(obstacles.get(k).getSize(), 2);
-              float discrim = b * b - 4*a*c;
               
-              if (discrim < 0) {
-                 //addEdge = false;
+              Vector L = obstacleCenter.d(pointA);
+              float tc = L.dotProd(edgeDirection);
+              float d = sqrt(L.magnitude()*L.magnitude() - (tc*tc));
+              if (d <= obstacles.get(k).getSize() * 0.5) {
+                addEdge = false;
               }
+              
             }
             if (addEdge) {
               paths.add(new Edge(milestones.get(i), milestones.get(j), dist));
@@ -398,9 +456,7 @@ class Environment {
 
       }
     }
-    if (debug) {
-      println("paths = " + paths.size());
-    }
+    
     int circleBoyTile = 0;
     float minDist = 999999;
     
@@ -410,22 +466,11 @@ class Environment {
       float dist = abs(milestones.get(i).getX() - circleBoy.getX());
       dist += abs(milestones.get(i).getY() - circleBoy.getY());
       
-      /*
-      if (debug) {
-        println(dist);
-      }
-      */
       if (dist < minDist) {
         minDist = dist;
         circleBoyTile = i;
       }
     }
-    if (debug) {
-      println("circleboytile i = " + milestones.get(circleBoyTile).getX());
-      println("circleboytile j = " + milestones.get(circleBoyTile).getY());
-    }
-    
-    
     
     dijkstraResult djikstraR = dijkstra(milestones, paths, milestones.get(circleBoyTile));
     float closestGoalDist = 999999;
@@ -447,22 +492,8 @@ class Environment {
       }
     }
     
-    if (debug) {
-      for (int i = 0; i < milestones.size(); i++) {
-        if (djikstraR.prev[i] != null) {
-          println("djikstraR.dist[" + i + "] = " + djikstraR.dist[i] + "    currentI = " + (i/20) + ", currentJ = " + (i%20) + "    prevI = " + djikstraR.prev[i].getX() + ", prevJ = " + djikstraR.prev[i].getY());
-        } else {
-          println("djikstraR.dist[" + i + "] = " + djikstraR.dist[i] + "    NULL");
-        }
-      }
-    }
-    
     circleBoyPath.add(milestones.get(closestGoal));
     
-    if (debug) {
-      println("closest goal i = " + milestones.get(closestGoal).getX());
-      println("closest goal j = " + milestones.get(closestGoal).getY());
-    }
     if (sampleRandomTiles) {
       Milestone pathTile = milestones.get(circleBoyTile);
       if (djikstraR.prev[closestGoal] != null) {
@@ -481,16 +512,9 @@ class Environment {
       }
     }
     
-    if (debug && !sampleRandomTiles) {
-      if (djikstraR.prev[closestGoal] != null) {
-        println("djikstraR.dist[" + closestGoal + "] = " + djikstraR.dist[closestGoal] + "    currentI = " + (closestGoal/20) + ", currentJ = " + (closestGoal%20) + "    prevI = " + djikstraR.prev[closestGoal].getX() + ", prevJ = " + djikstraR.prev[closestGoal].getY());
-      } else {
-        println("djikstraR.dist[" + closestGoal + "] = " + djikstraR.dist[closestGoal] + "    NULL");
-      }
+    if (drawAllPaths) {
+      dEdges = paths;
     }
-    
-    
-    dEdges = paths;
     Collections.reverse(circleBoyPath);
   } 
   
@@ -671,6 +695,9 @@ class CircleBoy {
   }
   float getY() {
     return pos.y;
+  }
+  float getSize() {
+    return size;
   }
   
   void drawCircleBoy() {
