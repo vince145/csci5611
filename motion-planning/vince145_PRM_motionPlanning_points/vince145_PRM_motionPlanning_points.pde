@@ -18,9 +18,10 @@ boolean debug = false;
 boolean extraObstacles = false;
 boolean middleObstacle = true;
 boolean rayCollision = false;
+boolean drawAllPaths = true;
 
 float boardSize = 400;
-float edgeMaxDistance = boardSize/10;
+float edgeMaxDistance = boardSize/10; // boardSize/10
 int numberOfSampledPoints = 1000;
 
 float w = 800;
@@ -162,6 +163,7 @@ class Environment {
   float centerX;
   float centerY;
   ArrayList<Milestone> circleBoyPath = new ArrayList<Milestone>();
+  ArrayList<Edge> dEdges = new ArrayList<Edge>();
   
   Environment(float startX, float startY, float startSize) {
     centerX = startX;
@@ -227,6 +229,19 @@ class Environment {
       }
     }
     */
+    
+    // Draws all edges for testing purposes if turned on
+    if (drawAllPaths) {
+      stroke(200, 15);
+      for (int i = 0; i < dEdges.size(); i++) {
+        float Ax = dEdges.get(i).getA().getX();
+        float Ay = dEdges.get(i).getA().getY();
+        float Bx = dEdges.get(i).getB().getX();
+        float By = dEdges.get(i).getB().getY();
+        line (Ax, Ay, Bx, By);
+      }
+    }
+    
     // Draw special tiles on top of base layer
     for (int i = 0; i < 20; i++) {
       for (int j = 0; j < 20; j++) {
@@ -251,7 +266,8 @@ class Environment {
         }
       }
     }
-    
+    pushMatrix();
+    translate(0,0,1);
     strokeWeight(5);
     for (int i = 0; i < circleBoyPath.size(); i++) {
         int milestoneType = circleBoyPath.get(i).getType();
@@ -274,6 +290,7 @@ class Environment {
                   break;
         }
     }
+    popMatrix();
     strokeWeight(1);
     // Outline of Environment
     stroke(255,0,0);
@@ -284,10 +301,15 @@ class Environment {
     for (int i = 0; i < obstacles.size(); i++) {
       obstacles.get(i).drawObstacle();
     }
+    pushMatrix();
+    translate(0,0,2);
     circleBoy.update();
     circleBoy.drawCircleBoy();
+    popMatrix();
     
     text("Frame rate: " + int(frameRate), centerX-(size*0.5), centerY+(size*0.5)+(size*0.05));
+    
+
   }
   
   void setPathType(int milestoneIndex, int newType) {
@@ -316,7 +338,7 @@ class Environment {
         for (int k = 0; k < obstacles.size() && milestoneValid; k++) {
           float dist = abs((randomX - obstacles.get(k).getX()));
           dist += abs((randomY - obstacles.get(k).getY()));
-          if (dist < obstacles.get(k).getSize()) {
+          if (dist < obstacles.get(k).getSize() * 0.7) {
             milestoneValid = false;
           }
         }
@@ -468,7 +490,7 @@ class Environment {
     }
     
     
-    
+    dEdges = paths;
     Collections.reverse(circleBoyPath);
   } 
   
