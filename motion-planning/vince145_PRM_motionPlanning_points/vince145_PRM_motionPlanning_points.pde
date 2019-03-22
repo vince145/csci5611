@@ -40,7 +40,7 @@ import java.util.Collections;
 boolean sampleRandomTiles = true;
 boolean continuousPathFinding = false;
 boolean debug = false;
-boolean extraObstacles = true;
+boolean extraObstacles = false;
 boolean middleObstacle = true;
 boolean rayCollision = true;
 boolean drawAllPaths = false;
