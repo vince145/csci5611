@@ -11,6 +11,8 @@
 // https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm
 // pseudocode
 //
+//
+// http://www.kfish.org/boids/pseudocode.html
 //////////////////////////////////////////////////////////////////
 // TODO: 
 //
@@ -24,9 +26,12 @@ PeasyCam cam;
 float fov = PI/3.0;
 
 
+boolean chickensFollow = false;
+boolean chickenBoid = true;
+
 float gameSize = 1000;
 float edgeMaxDistance = gameSize/3; // boardSize/10
-int numberOfSampledPoints = 500;
+int numberOfSampledPoints = 50;
 
 float w = 800;
 float h = 600;
@@ -34,11 +39,23 @@ float dt = 0.001;
 
 Game game = new Game(0.0, 0.0, 0.0, gameSize);
 
+Vector2D tPos1 = new Vector2D(gameSize/2, gameSize/2);
+Vector2D tPos2 = new Vector2D(-gameSize/2, -gameSize/2);
+Vector2D tPos3 = new Vector2D(0,0);
+Vector2D tPos4 = new Vector2D(gameSize/2, 0);
+float tDis = tPos1.d(tPos2).magnitude();
+float tDis2 = tPos1.d(tPos3).magnitude();
+float tDis3 = tPos4.d(tPos3).magnitude();
+
+
 void setup() {
-  size(800, 600, P3D);
+  size(1600, 900, P3D);
   fill(255);
-  cam = new PeasyCam(this, 100);
-  cam.setMinimumDistance(100);
+  println(tDis);
+  println(tDis2);
+  println(tDis3);
+  cam = new PeasyCam(this, 500);
+  cam.setMinimumDistance(500);
   cam.setMaximumDistance(800);
 }
 
@@ -65,6 +82,12 @@ void handleInput(char input) {
   switch (input) {
     case ' ': game = new Game(0.0, 0.0, 0.0, gameSize);
               break;
+    case '1': if (game.getUser().getState() != 1) {
+                game.getUser().setState(1);
+              } else {
+                game.getUser().setState(0);
+              }
+              break;        
     default:
               break;
   }
@@ -218,415 +241,6 @@ public class Vector3D {
     y = 0;
   }
 }
-
-
-
-//////////////////////////////////////////////////////////////////
-//
-// 
-//
-// PRM MOTION
-//
-
-/*
-class Environment {
-  ArrayList<Obstacle> obstacles = new ArrayList<Obstacle>();
-  CircleBoy circleBoy;
-  float size;
-  float centerX;
-  float centerY;
-  ArrayList<Milestone> circleBoyPath = new ArrayList<Milestone>();
-  ArrayList<Edge> dEdges = new ArrayList<Edge>();
-  
-  Environment(float startX, float startY, float startSize) {
-    centerX = startX;
-    centerY = startY;
-    size = startSize;
-    
-    // Setup agent
-    circleBoy = new CircleBoy(centerX-(size/2)+(size/40),centerY+(size/2)-(size/40), size/40);
-    
-    // Set Obstacles
-    
-  }
-  
-  void drawEnvironment() {
-    stroke(150,150,150);
-    
-    // Draws all edges for testing purposes if turned on
-    if (drawAllPaths) {
-      pushMatrix();
-      if (drawAllPathsOnTop) {
-        translate(0,0,10);
-      }
-      stroke(200, 15);
-      for (int i = 0; i < dEdges.size(); i++) {
-        float Ax = dEdges.get(i).getA().getX();
-        float Ay = dEdges.get(i).getA().getY();
-        float Bx = dEdges.get(i).getB().getX();
-        float By = dEdges.get(i).getB().getY();
-        line (Ax, Ay, Bx, By);
-      }
-      popMatrix();
-    }
-    
-    pushMatrix();
-    translate(0,0,1);
-    strokeWeight(5);
-    for (int i = 0; i < circleBoyPath.size(); i++) {
-        int milestoneType = circleBoyPath.get(i).getType();
-        switch (milestoneType) {
-          case 0: 
-                  break;
-          case 1: stroke(255,255,0);
-                  point(circleBoyPath.get(i).getX(), circleBoyPath.get(i).getY());
-                  break;
-          case 2: stroke(255,0,0);
-                  point(circleBoyPath.get(i).getX(), circleBoyPath.get(i).getY());
-                  break;
-          case 3: stroke(0,255,0);
-                  point(circleBoyPath.get(i).getX(), circleBoyPath.get(i).getY());
-                  break;
-          case 4: stroke(0,0,255);
-                  point(circleBoyPath.get(i).getX(), circleBoyPath.get(i).getY());
-                  break;
-          default:
-                  break;
-        }
-    }
-    popMatrix();
-    strokeWeight(1);
-    
-    // Red outline of Environment
-    stroke(255,0,0);
-    line(centerX-(size*0.5), centerY-(size*0.5), centerX+(size*0.5), centerY-(size*0.5));
-    line(centerX+(size*0.5), centerY-(size*0.5), centerX+(size*0.5), centerY+(size*0.5));
-    line(centerX+(size*0.5), centerY+(size*0.5), centerX-(size*0.5), centerY+(size*0.5));
-    line(centerX-(size*0.5), centerY+(size*0.5), centerX-(size*0.5), centerY-(size*0.5));
-    for (int i = 0; i < obstacles.size(); i++) {
-      obstacles.get(i).drawObstacle();
-    }
-    pushMatrix();
-    translate(0,0,2);
-    circleBoy.update();
-    circleBoy.drawCircleBoy();
-    popMatrix();
-  }
-  
-  void setPathType(int milestoneIndex, int newType) {
-    circleBoyPath.get(milestoneIndex).setType(newType);
-  }
-  
-  ArrayList<Milestone> getPath() {
-    return circleBoyPath;
-  }
-  
-  
-  void PRM() {
-    
-    ArrayList<Milestone> milestones = new ArrayList<Milestone>();
-    ArrayList<Edge> paths = new ArrayList<Edge>();
-    
-    // Sample random points
-    for (int i = 0; i < numberOfSampledPoints; i++) {
-      // Randomly sample configurations
-      float randomX =  random(centerX - size * 0.5, centerX + size * 0.5);
-      float randomY =  random(centerY - size * 0.5, centerY + size * 0.5);
-      // Test configurations for collisions
-      if (obstacles.size() > 0) {
-        
-        boolean milestoneValid = true;
-        //float circleBoySize = circleBoy.getSize();
-        for (int k = 0; k < obstacles.size() && milestoneValid; k++) {
-          Vector d = new Vector(randomX - obstacles.get(k).getX(), randomY - obstacles.get(k).getY());
-          float dist = d.magnitude();
-          //dist = dist + circleBoySize;
-          if (dist < obstacles.get(k).getSize() * 0.5) {
-            milestoneValid = false;
-          }
-        }
-        if (milestoneValid) {
-          milestones.add(new Milestone(randomX, randomY, 0));
-        }
-      } else {
-        milestones.add(new Milestone(randomX, randomY, 0));
-      }
-    }
-    milestones.add(new Milestone(circleBoy.getX(), circleBoy.getY(), 0));
-    milestones.add(new Milestone(centerX-(size*0.5)+(19*size/20)+size/40, centerY-(size*0.5)+(0*size/20)+size/40, 1));
-    
-    // Straight lines connect neighboring milestones
-    for (int i = 0; i < milestones.size(); i++) {
-      for (int j = 0; j < milestones.size(); j++) {
-        float dist = abs((milestones.get(j).getX() - milestones.get(i).getX()));
-        dist += abs((milestones.get(j).getY() - milestones.get(i).getY()));
-        if (dist < edgeMaxDistance && dist > 0) {
-          if (rayCollision) {
-            
-            // Ray - sphere intersection checks
-            boolean addEdge = true;
-            for (int k = 0; k < obstacles.size(); k++) {
-              // A = origin tile
-              // B = end tile
-              // C = obstacle center point
-              // r = sphere radius
-              Vector pointA = new Vector(milestones.get(i).getX(), milestones.get(i).getY());
-              Vector pointB = new Vector(milestones.get(j).getX(), milestones.get(j).getY());
-              Vector edgeDirection = pointB.d(pointA);
-              edgeDirection.normalizeV();
-              Vector obstacleCenter = new Vector(obstacles.get(k).getX(), obstacles.get(k).getY());
-              
-              Vector L = obstacleCenter.d(pointA);
-              float tc = L.dotProd(edgeDirection);
-              float d = sqrt(L.magnitude()*L.magnitude() - (tc*tc));
-              if (d <= obstacles.get(k).getSize() * 0.5) {
-                addEdge = false;
-              }
-              
-            }
-            if (addEdge) {
-              paths.add(new Edge(milestones.get(i), milestones.get(j), dist));
-            }
-          } else {
-            paths.add(new Edge(milestones.get(i), milestones.get(j), dist));
-          }
-        }
-
-      }
-    }
-    
-    int circleBoyTile = 0;
-    float minDist = 999999;
-    
-    // Finds the tile closest to the circleBoy
-    for (int i = 0; i < milestones.size(); i++) {
-      
-      float dist = abs(milestones.get(i).getX() - circleBoy.getX());
-      dist += abs(milestones.get(i).getY() - circleBoy.getY());
-      
-      if (dist < minDist) {
-        minDist = dist;
-        circleBoyTile = i;
-      }
-    }
-    
-    dijkstraResult djikstraR = dijkstra(milestones, paths, milestones.get(circleBoyTile));
-    float closestGoalDist = 999999;
-    int closestGoal = 0;
-    
-    
-    for (int i = 0; i < milestones.size(); i++) {
-      if (milestones.get(i).getType() == 1) {
-        if (debug) {
-          println("djikstraR.dist[" + i + "] = " + djikstraR.dist[i]);
-        }
-        if (djikstraR.dist[i] < closestGoalDist) {
-          closestGoalDist = djikstraR.dist[i];
-          closestGoal = i;
-          if (debug) {
-            println("goal added");
-          }
-        }
-      }
-    }
-    
-    circleBoyPath.add(milestones.get(closestGoal));
-    
-    if (sampleRandomTiles) {
-      Milestone pathTile = milestones.get(circleBoyTile);
-      if (djikstraR.prev[closestGoal] != null) {
-        pathTile = djikstraR.prev[closestGoal];
-      }
-      while (pathTile != null) {
-        circleBoyPath.add(pathTile);
-        if (debug) {
-          if (pathTile.getPrev() != null) {
-            println("currentI = " + pathTile.getX() + " currentJ = " + pathTile.getY() + ",    prevI = " + pathTile.getPrev().getX() + " prevJ = " + pathTile.getPrev().getY());
-          } else {
-            println("currentI = " + pathTile.getX() + " currentJ = " + pathTile.getY() + ",   prev = NULL");
-          }
-        }
-        pathTile = pathTile.getPrev();
-      }
-    }
-    
-    if (drawAllPaths) {
-      dEdges = paths;
-    }
-    Collections.reverse(circleBoyPath);
-  } 
-  
-}
-
-class Edge {
-  Milestone A;
-  Milestone B;
-  float cost;
-  
-  Edge(Milestone startA, Milestone startB, float startCost) {
-    A = startA;
-    B = startB;
-    cost = startCost;
-  }
-  
-  Milestone getA() {
-    return A;
-  }
-  
-  Milestone getB() {
-    return B;
-  }
-  
-  float getCost() {
-    return cost;
-  }
-}
-
-class Milestone {
-  int type;
-  float x;
-  float y;
-  Milestone prev;
-  
-  Milestone(float startX, float startY, int startType) {
-    type = startType;
-    x = startX;
-    y = startY;
-  }
-  
-  void setType(int newType) {
-    type = newType;
-  }
-  
-  int getType() {
-    return type;
-  }
-  
-  float getX() {
-    return x;
-  }
-  
-  float getY() {
-    return y;
-  }
-  
-  void setPrev(Milestone newPrev) {
-    prev = newPrev;
-  }
-  Milestone getPrev() {
-    return prev;
-  }
-  boolean compare(Milestone A) {
-    if (A == null) {
-      return false;
-    }
-    if (this.x == A.getX() && this.y == A.getY()) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-}
-
-
-class Obstacle {
-  float x;
-  float y;
-  float size;
-  
-  Obstacle(float startX, float startY, float startSize) {
-    this.x = startX;
-    this.y = startY;
-    this.size = startSize;
-  }
-  
-  float getX() {
-    return x;
-  }
-  
-  float getY() {
-    return y;
-  }
-  
-  float getSize() {
-    return size;
-  }
-  void drawObstacle() {
-    pushMatrix();
-    fill(100,0,0);
-    stroke(255,0,0);
-    translate(0,0,1);
-    ellipse(this.x, this.y, this.size, this.size);
-    popMatrix();
-  }
-}
-
-class CircleBoy {
-  Vector pos;
-  Vector vel;
-  float size;
-  int pathIndex = 0;
-  
-  CircleBoy(float startX, float startY, float startSize) {
-    this.pos = new Vector(startX, startY);
-    this.size = startSize * 2;
-    this.vel = new Vector(0.0,0.0);
-  }
-  
-  float getX() {
-    return pos.x;
-  }
-  float getY() {
-    return pos.y;
-  }
-  float getSize() {
-    return size;
-  }
-  
-  void drawCircleBoy() {
-    pushMatrix();
-    fill(255);
-    stroke(50,200,50);
-    translate(0,0,1);
-    ellipse(this.pos.x-(size/2)+boardSize/40, this.pos.y+(size/2)-boardSize/40, this.size, this.size);
-    popMatrix();
-  }
-  
-  void update() {
-    ArrayList<Milestone> path = board.getPath();
-    if (pathIndex != path.size()) {
-      Vector dist = new Vector(path.get(pathIndex).getX() - this.pos.x, path.get(pathIndex).getY() - this.pos.y);
-      boolean printCode = false;
-      
-      if (printCode && debug) {
-        println("path size = " + path.size());
-        println("path i = " + path.get(0).getX());
-        println("path j = " + path.get(0).getY());
-        println("xDis = " + dist.x);
-        println("yDis = " + dist.y);
-      }
-      
-      if (abs(dist.x) + abs(dist.y) < 1) {
-        if (path.get(pathIndex).getType() == 0) {
-          board.setPathType(pathIndex, 3);
-          pathIndex++;
-        }
-      }
-      if (dist.magnitude() > boardSize * 0.0025) {
-        dist.divide(dist.magnitude());
-        dist.scaler(boardSize * 4.0);
-        vel = dist;
-      } else {
-        dist.scaler(boardSize * 0.625);
-        vel = dist;
-      }
-      pos.addV(vel.scalerNC(dt));
-        
-    }
-    
-  }
-}
-*/
 
 
 //////////////////////////////////////////////////////////////////
@@ -786,10 +400,12 @@ class Milestone {
 class Player {
   Vector2D pos;
   Vector2D vel;
+  int state;
   
   Player(float startX, float startZ) {
     this.pos = new Vector2D(startX, startZ);
     this.vel = new Vector2D(0.0, 0.0);
+    this.state = 0;
   }
   
   Vector2D getPos() {
@@ -798,6 +414,14 @@ class Player {
   
   Vector2D getVel() {
     return this.vel;
+  }
+  
+  int getState() {
+    return this.state;
+  }
+  
+  void setState(int newState) {
+    this.state = newState;
   }
   
   void move(char direction) {
@@ -834,7 +458,6 @@ class Player {
     box(20,20,20); // head
     translate(5,-5,10);
     fill(0); // black
-    int state = 0;
     switch (state) {
       case 0: 
               break;
@@ -893,25 +516,74 @@ class Chicken {
   }
   
   void update() {
-    if (path.size() >= 1 && pathIndex == path.size()-1) {
-      Vector2D dist = path.get(pathIndex).getPos().d(this.pos);
-      if (dist.magnitude() < 27.5) {
-        if (path.get(pathIndex).getType() == 0) {
-          path.get(pathIndex).setType(3);
-          pathIndex++;
+    
+    if (chickensFollow) {
+      float distMin = 15.0;
+      if (path.size() >= 1 && pathIndex == path.size()-1) {
+        Vector2D dist = path.get(pathIndex).getPos().d(this.pos);
+        println(dist.x + "    " + dist.z);
+        if (dist.magnitude() < 27.5) {
+          if (path.get(pathIndex).getType() == 0) {
+            path.get(pathIndex).setType(3);
+            pathIndex++;
+          }
+          vel.reset();
+        } else if (dist.magnitude() > gameSize * 0.0025) { // fix gamesize scaling
+            if (dist.x > 0 && dist.z < distMin && dist.z > -1.0*distMin) {
+              dist.divide(dist.magnitude());
+              rotation = -PI/2;
+            } else if (dist.x < 0 && dist.z < distMin && dist.z > -1.0*distMin) {
+              dist.divide(dist.magnitude());
+              rotation = PI/2;
+            } else if (dist.x < distMin && dist.x > -1.0*distMin && dist.z > 0) {
+              dist.divide(dist.magnitude());
+              rotation = PI;
+            } else if (dist.x < distMin && dist.x > -1.0*distMin && dist.z < 0) {
+              dist.divide(dist.magnitude());
+              rotation = 0;
+            } else if (dist.x > 0 && dist.z > 0) {
+              dist.divide(dist.magnitude());
+              rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
+            } else if (dist.x > 0 && dist.z < 0) {
+              dist.divide(dist.magnitude());
+              rotation = atan(dist.z/(dist.x + 0.0001));
+            } else if (dist.x < 0 && dist.z > 0) {
+              dist.divide(dist.magnitude());
+              rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
+            } else if (dist.x < 0 && dist.z < 0) {
+              dist.divide(dist.magnitude());
+              rotation = atan(dist.z/(dist.x + 0.0001)) + 2*PI;
+            } else {
+              dist.divide(dist.magnitude());
+            }
+            // Handles direction and speed toward path milestone
+            dist.scaler(gameSize * 2.75);
+            vel = dist;
+        } else {
+            dist.scaler(gameSize * 0.625);
+            vel = dist;
         }
-        vel.reset();
-      } else if (dist.magnitude() > gameSize * 0.0025) { // fix gamesize scaling
-          if (dist.x > 0 && dist.z == 0) {
+        pos.addV(vel.scalerNC(dt));
+      } else if (pathIndex != path.size()) {
+        Vector2D dist = path.get(pathIndex).getPos().d(this.pos);
+        if (dist.magnitude() < 1) {
+          if (path.get(pathIndex).getType() == 0) {
+            path.get(pathIndex).setType(3);
+            pathIndex++;
+          }
+        }
+        // Manages rotating the chicken
+        if (dist.magnitude() > gameSize * 0.0025) {
+          if (dist.x > 0 && dist.z < distMin && dist.z > -1.0*distMin) {
             dist.divide(dist.magnitude());
             rotation = -PI/2;
-          } else if (dist.x < 0 && dist.z == 0) {
+          } else if (dist.x < 0 && dist.z < distMin && dist.z > -1.0*distMin) {
             dist.divide(dist.magnitude());
             rotation = PI/2;
-          } else if (dist.x == 0 && dist.z > 0) {
+          } else if (dist.x < distMin && dist.x > -1.0*distMin && dist.z > 0) {
             dist.divide(dist.magnitude());
             rotation = PI;
-          } else if (dist.x == 0 && dist.z < 0) {
+          } else if (dist.x < distMin && dist.x > -1.0*distMin && dist.z < 0) {
             dist.divide(dist.magnitude());
             rotation = 0;
           } else if (dist.x > 0 && dist.z > 0) {
@@ -925,63 +597,55 @@ class Chicken {
             rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
           } else if (dist.x < 0 && dist.z < 0) {
             dist.divide(dist.magnitude());
-            rotation = atan(dist.z/(dist.x + 0.0001));
+            rotation = atan(dist.z/(dist.x + 0.0001)) + 2*PI;
           } else {
             dist.divide(dist.magnitude());
           }
           // Handles direction and speed toward path milestone
           dist.scaler(gameSize * 2.75);
           vel = dist;
-      } else {
+        } else {
           dist.scaler(gameSize * 0.625);
           vel = dist;
+        } 
       }
-      pos.addV(vel.scalerNC(dt));
-    } else if (pathIndex != path.size()) {
-      Vector2D dist = path.get(pathIndex).getPos().d(this.pos);
-      if (dist.magnitude() < 1) {
-        if (path.get(pathIndex).getType() == 0) {
-          path.get(pathIndex).setType(3);
-          pathIndex++;
-        }
-      }
-      // Manages rotating the chicken
-      if (dist.magnitude() > gameSize * 0.0025) {
-        if (dist.x > 0 && dist.z == 0) {
-          dist.divide(dist.magnitude());
-          rotation = -PI/2;
-        } else if (dist.x < 0 && dist.z == 0) {
-          dist.divide(dist.magnitude());
-          rotation = PI/2;
-        } else if (dist.x == 0 && dist.z > 0) {
-          dist.divide(dist.magnitude());
-          rotation = PI;
-        } else if (dist.x == 0 && dist.z < 0) {
-          dist.divide(dist.magnitude());
-          rotation = 0;
-        } else if (dist.x > 0 && dist.z > 0) {
-          dist.divide(dist.magnitude());
-          rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
-        } else if (dist.x > 0 && dist.z < 0) {
-          dist.divide(dist.magnitude());
-          rotation = atan(dist.z/(dist.x + 0.0001));
-        } else if (dist.x < 0 && dist.z > 0) {
-          dist.divide(dist.magnitude());
-          rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
-        } else if (dist.x < 0 && dist.z < 0) {
-          dist.divide(dist.magnitude());
-          rotation = atan(dist.z/(dist.x + 0.0001));
-        } else {
-          dist.divide(dist.magnitude());
-        }
-        // Handles direction and speed toward path milestone
-        dist.scaler(gameSize * 2.75);
-        vel = dist;
-      } else {
-        dist.scaler(gameSize * 0.625);
-        vel = dist;
-      }
-      pos.addV(vel.scalerNC(dt)); 
+      
+    }
+    
+    pos.addV(vel.scalerNC(dt));
+    
+    if (pos.x < -1.0*gameSize/2) {
+      vel.x *= -1;
+      pos.x += 2;
+    } else if (pos.x > gameSize/2) {
+      vel.x *= -1;
+      pos.x -= 2;
+    }
+    if (pos.z < -1.0*gameSize/2) {
+      vel.z *= -1;
+      pos.z += 2;
+    } else if (pos.z > gameSize/2) {
+      vel.z *= -1;
+      pos.z -= 2;
+    }
+    
+    float velMin = 0.1;
+    if (vel.x > 0 && vel.z < velMin && vel.z > -1.0*velMin) {
+      rotation = -PI/2;
+    } else if (vel.x < 0 && vel.z < velMin && vel.z > -1.0*velMin) {
+      rotation = PI/2;
+    } else if (vel.x < velMin && vel.x > -1.0*velMin && vel.z > 0) {
+      rotation = PI;
+    } else if (vel.x < velMin && vel.x > -1.0*velMin && vel.z < 0) {
+      rotation = 0;
+    } else if (vel.x > 0 && vel.z > 0) {
+      rotation = atan(vel.z/(vel.x + 0.0001)) + PI;
+    } else if (vel.x > 0 && vel.z < 0) {
+      rotation = atan(vel.z/(vel.x + 0.0001));
+    } else if (vel.x < 0 && vel.z > 0) {
+      rotation = atan(vel.z/(vel.x + 0.0001)) + PI;
+    } else if (vel.x < 0 && vel.z < 0) {
+      rotation = atan(vel.z/(vel.x + 0.0001)) + 2*PI;
     }
     
   }
@@ -1089,11 +753,17 @@ class Game {
     user = new Player(this.center.x, this.center.z);
     
     // Setup chickens
-    chickens.add(new Chicken(this.center.x, this.center.z - 200));
-    chickens.add(new Chicken(this.center.x - 200, this.center.z));
+    for (int i = 0; i < 100; i++) {
+      float randomX = random(this.center.x-this.size*0.5, this.center.x+this.size*0.5);
+      float randomZ = random(this.center.y-this.size*0.5, this.center.y+this.size*0.5);
+      chickens.add(new Chicken(randomX, randomZ));
+    }
     
-    for (int i = 0; i < chickens.size(); i++) {
-      chickens.get(i).setPath(PRM(chickens.get(i)));
+    // Chickens will attempt to follow the player if turned on
+    if (chickensFollow) {
+      for (int i = 0; i < chickens.size(); i++) {
+        chickens.get(i).setPath(PRM(chickens.get(i)));
+      }
     }
     
     // Set Obstacles
@@ -1110,6 +780,135 @@ class Game {
     return this.user;
   }
   
+  
+  void boids() {
+
+    if (chickens.size() > 1) {
+      float baseScale = 0.6;
+      float localFlockDistance = 500;
+      float frightDistance = 500;
+      float attractDistance = 400;
+      float matchPosM = 30 * baseScale;
+      float moveAwayM = 60 * baseScale;
+      float matchVelM = 5 * baseScale;
+      float followPlayerM = 10 * baseScale;
+      float distAwayFromOthers = 100 * baseScale;
+      Vector2D[] sumsOfBoid = new Vector2D[chickens.size()];
+      for (int i = 0; i < chickens.size(); i++) {
+        Vector2D sumOfBoid = new Vector2D(0,0);
+        
+        /////////////////////////////////////////////////////
+        
+        // Move each chicken toward the center position
+        // of all chickens
+        
+        Vector2D centerOfChickens = new Vector2D(0,0);
+        for (int j = 0; j < chickens.size(); j++) {
+          float jDist = chickens.get(j).getPos().d(chickens.get(i).getPos()).magnitude();
+          if (i != j && jDist < localFlockDistance) {
+            centerOfChickens.addV(chickens.get(j).getPos());
+          }
+        }
+        centerOfChickens.divide(chickens.size()-1);
+        Vector2D dist = centerOfChickens.d(chickens.get(i).getPos());
+        dist.normalizeV();
+        if ((int) random(0,10) > 5) {
+          dist.scaler(-1.0);
+        }
+        dist.scaler(matchPosM);
+        sumOfBoid.addV(dist);
+        
+        /////////////////////////////////////////////////////
+        
+        // Keep chickens away from each other
+        Vector2D moveAway = new Vector2D(0,0);
+        for (int j = 0; j < chickens.size(); j++) {
+          if (i != j) {
+            Vector2D dist2 = chickens.get(i).getPos().d(chickens.get(j).getPos());
+            float dist2Mag = dist2.magnitude();
+            if (dist2Mag < distAwayFromOthers) {
+              moveAway.addV(dist2);
+            }
+          }
+        }
+        moveAway.normalizeV();
+        moveAway.scaler(moveAwayM);
+        sumOfBoid.addV(moveAway);
+        
+        /////////////////////////////////////////////////////
+        
+        // Match nearby chickens velocities
+        Vector2D centerOfChickensVel = new Vector2D(0,0);
+        for (int j = 0; j < chickens.size(); j++) {
+          float jDist = chickens.get(j).getPos().d(chickens.get(i).getPos()).magnitude();
+          if (i != j && jDist < localFlockDistance) {
+            centerOfChickensVel.addV(chickens.get(j).getVel());
+          }
+        }
+        centerOfChickensVel.divide(chickens.size()-1);
+        centerOfChickensVel.normalizeV();
+        centerOfChickensVel.scaler(matchVelM);
+        sumOfBoid.addV(centerOfChickensVel);
+        
+        /////////////////////////////////////////////////////
+        
+        // Flock around player
+        
+        Vector2D distToPlayer = user.getPos().d(chickens.get(i).getPos());
+        if (user.getState() == 1) {
+          if (distToPlayer.magnitude() < frightDistance) {
+            distToPlayer.normalizeV();
+            distToPlayer.scaler(followPlayerM);
+            float spookFactor = -3.0*followPlayerM/(distToPlayer.magnitude()+0.0001);
+            distToPlayer.scaler(spookFactor);
+            
+            sumOfBoid.addV(distToPlayer);
+          }
+        } else {
+          if (distToPlayer.magnitude() < attractDistance) {
+            distToPlayer.normalizeV();
+            distToPlayer.scaler(followPlayerM);
+            
+            sumOfBoid.addV(distToPlayer);
+          }
+        }
+
+        
+        /////////////////////////////////////////////////////
+        
+        
+        
+        
+        /////////////////////////////////////////////////////
+        
+        
+        /////////////////////////////////////////////////////
+        
+        sumsOfBoid[i] = sumOfBoid;
+        /////////////////////////////////////////////////////
+      }
+      for (int i = 0; i < chickens.size(); i++) {
+        chickens.get(i).getVel().addV(sumsOfBoid[i]);
+      }
+    }
+    
+    
+    // Limits the speed of the chickens
+    if (chickens.size() > 1) {
+      for (int i = 0; i < chickens.size(); i++) {
+        float limitSpeed = 1400;
+        
+        float chickenSpeed = chickens.get(i).getVel().magnitude();
+        if (chickenSpeed > limitSpeed) {
+          chickens.get(i).getVel().divide(chickenSpeed);
+          chickens.get(i).getVel().scaler(limitSpeed);
+        }
+      }
+    }
+  }
+  
+  
+  
   void drawGame() {
     
     /////////////////////////////////////////////////////
@@ -1125,31 +924,53 @@ class Game {
     //
     /////////////////////////////////////////////////////
     
-    // Draws obstacles
-    for (int i = 0; i < obstacles.size(); i++) {
-      obstacles.get(i).drawObstacle();
-    }
     
-    // Draws chickens
-    for (int i = 0; i < chickens.size(); i++) {
-      chickens.get(i).drawChicken();
-    }
-    
-    // Draws player
-    user.drawPlayer();
-    
+    /////////////////////////////////////////////////////
     // Update chickens
     for (int i = 0; i < chickens.size(); i++) {
       chickens.get(i).update();
     }
-    if (searchTimer == 100) {
-      for (int i = 0; i < chickens.size(); i++) {
-        chickens.get(i).setPath(PRM(chickens.get(i)));
+    
+    // Chickens will attempt to follow the player if turned on
+    if (chickensFollow) {
+      if (searchTimer == 100) {
+        for (int i = 0; i < chickens.size(); i++) {
+          chickens.get(i).setPath(PRM(chickens.get(i)));
+        }
+        searchTimer = 0;
+      } else {
+        searchTimer++;
       }
-      searchTimer = 0;
-    } else {
-      searchTimer++;
     }
+    
+    // Chickens will flock if turned on
+    if (chickenBoid) {
+      this.boids();
+    }
+    //
+    /////////////////////////////////////////////////////
+    
+    /////////////////////////////////////////////////////
+    // Draws obstacles
+    for (int i = 0; i < obstacles.size(); i++) {
+      obstacles.get(i).drawObstacle();
+    }
+    //
+    /////////////////////////////////////////////////////
+    
+    /////////////////////////////////////////////////////
+    // Draws chickens
+    for (int i = 0; i < chickens.size(); i++) {
+      chickens.get(i).drawChicken();
+    }
+    //
+    /////////////////////////////////////////////////////
+    
+    /////////////////////////////////////////////////////
+    // Draws player
+    user.drawPlayer();
+    //
+    /////////////////////////////////////////////////////
   }
   
   
