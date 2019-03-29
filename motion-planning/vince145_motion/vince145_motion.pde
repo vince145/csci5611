@@ -401,11 +401,13 @@ class Player {
   Vector2D pos;
   Vector2D vel;
   int state;
+  int animationFrame;
   
   Player(float startX, float startZ) {
     this.pos = new Vector2D(startX, startZ);
     this.vel = new Vector2D(0.0, 0.0);
     this.state = 0;
+    this.animationFrame = 0;
   }
   
   Vector2D getPos() {
@@ -495,12 +497,14 @@ class Chicken {
   ArrayList<Milestone> path = new ArrayList<Milestone>();
   int pathIndex;
   float rotation;
+  int animationFrame;
   
   Chicken(float startX, float startZ) {
     this.pos = new Vector2D(startX, startZ);
     this.vel = new Vector2D(0.0, 0.0);
     this.pathIndex = 0;
     this.rotation = 0;
+    this.animationFrame = 0;
   }
   
   Vector2D getPos() {
@@ -614,6 +618,7 @@ class Chicken {
     
     pos.addV(vel.scalerNC(dt));
     
+    // Handles edge of game collision
     if (pos.x < -1.0*gameSize/2) {
       vel.x *= -1;
       pos.x += 2;
@@ -629,6 +634,21 @@ class Chicken {
       pos.z -= 2;
     }
     
+    // Handles collision with obstacles
+    for (int i = 0; i < game.getObstacles().size(); i++) {
+      Vector2D xBound = game.getObstacles().get(i).getXBound();
+      Vector2D zBound = game.getObstacles().get(i).getZBound();
+      
+      
+      if (pos.x > xBound.x && pos.x < xBound.z) {
+        vel.x *= -1;
+
+      } 
+      if (pos.z > zBound.x && pos.z < zBound.z) {
+        vel.z *= -1;
+      } 
+    }
+    
     float velMin = 0.1;
     if (vel.x > 0 && vel.z < velMin && vel.z > -1.0*velMin) {
       rotation = -PI/2;
@@ -639,13 +659,13 @@ class Chicken {
     } else if (vel.x < velMin && vel.x > -1.0*velMin && vel.z < 0) {
       rotation = 0;
     } else if (vel.x > 0 && vel.z > 0) {
-      rotation = atan(vel.z/(vel.x + 0.0001)) + PI;
+      rotation = atan(vel.z/(vel.x + 0.0000001)) + PI;
     } else if (vel.x > 0 && vel.z < 0) {
-      rotation = atan(vel.z/(vel.x + 0.0001));
+      rotation = atan(vel.z/(vel.x + 0.0000001));
     } else if (vel.x < 0 && vel.z > 0) {
-      rotation = atan(vel.z/(vel.x + 0.0001)) + PI;
+      rotation = atan(vel.z/(vel.x + 0.0000001)) + PI;
     } else if (vel.x < 0 && vel.z < 0) {
-      rotation = atan(vel.z/(vel.x + 0.0001)) + 2*PI;
+      rotation = atan(vel.z/(vel.x + 0.0000001)) + 2*PI;
     }
     
   }
@@ -726,6 +746,18 @@ class Obstacle {
     return this.h;
   }
   
+  Vector2D getXBound() {
+    Vector2D resultXBound = new Vector2D(this.pos.x - this.w * 0.5,
+                                         this.pos.x + this.w * 0.5);
+    return resultXBound;
+  }
+  
+  Vector2D getZBound() {
+    Vector2D resultZBound = new Vector2D(this.pos.z - this.b * 0.5,
+                                         this.pos.z + this.b * 0.5);
+    return resultZBound;
+  }
+  
   void drawObstacle() {
     pushMatrix();
     fill(100,0,0);
@@ -780,6 +812,9 @@ class Game {
     return this.user;
   }
   
+  ArrayList<Obstacle> getObstacles() {
+    return this.obstacles;
+  }
   
   void boids() {
 
