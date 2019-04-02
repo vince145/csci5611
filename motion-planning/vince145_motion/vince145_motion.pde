@@ -31,7 +31,9 @@ boolean chickenBoid = true;
 boolean wolfAttack = true;
 boolean gameRunning = false;
 boolean gameSetup = true;
+boolean cleanGame = false;
 
+boolean placedObject = false;
 float gameSize = 1500;
 float edgeMaxDistance = gameSize/2; // boardSize/10
 int numberOfSampledPoints = 50;
@@ -67,6 +69,9 @@ void draw() {
     if (gameRunning) {
       game.getUser().move(key);
     }
+    if (gameSetup) {
+      game.getSetupAgent().move(key);
+    }
   }
   if (inputDelay > 1000) {
     inputDelay = 100;
@@ -75,17 +80,25 @@ void draw() {
   
 }
 
-
 void handleInput(char input) {
   switch (input) {
-    case ' ': if (inputDelay >= 20) {
-                game = new Game(0.0, 0.0, 0.0, gameSize);
+    case 'x': if (inputDelay >= 20) {
                 gameRunning = false;
                 gameSetup = true;
+                cleanGame = false;
+                game = new Game(0.0, 0.0, 0.0, gameSize);
                 inputDelay = 0;
               }
               break;
-    case 'q': if (inputDelay >= 20) {
+    case 'c': if (inputDelay >= 20) {
+                gameRunning = false;
+                gameSetup = true;
+                cleanGame = true;
+                game = new Game(0.0, 0.0, 0.0, gameSize);
+                inputDelay = 0;
+              }
+              break;
+    case 'z': if (inputDelay >= 20) {
                 gameRunning = !gameRunning;
                 if (gameSetup) {
                   gameSetup = false;
@@ -103,7 +116,28 @@ void handleInput(char input) {
                   inputDelay = 0;
                 }
               }
-              break;        
+              break;
+    case 'q': if (inputDelay >= 20) {
+                if (gameSetup) {
+                  game.getSetupAgent().stateDec();
+                  inputDelay = 0;
+                }
+              }
+              break;
+    case 'e': if (inputDelay >= 20) {
+                if (gameSetup) {
+                  game.getSetupAgent().stateInc();
+                  inputDelay = 0;
+                }
+              }
+              break;
+    case ' ': if (inputDelay >= 20) {
+                if (gameSetup) {
+                  game.setupAddObject();
+                  inputDelay = 0;
+                }
+              }
+              break;
     default:
               break;
   }
@@ -427,6 +461,253 @@ class Milestone {
   }
 }
 
+class SetupAgent {
+  Vector2D pos;
+  int state;
+  float w;
+  float b;
+  float h;
+  
+  SetupAgent(float startX, float startZ) {
+    this.pos = new Vector2D(startX, startZ);
+    this.state = 0;
+    this.w = 75;
+    this.h = 75;
+    this.b = 75;
+  }
+  
+  Vector2D getPos() {
+    return this.pos;
+  }
+  float getW() {
+    return w;
+  }
+  float getB() {
+    return b;
+  }
+  float getH() {
+    return h;
+  }
+  int getState() {
+    return this.state;
+  }
+  
+  void stateInc() {
+    if (this.state < 3) {
+      this.state++;
+    }
+  }
+  
+  void stateDec() {
+    if (this.state > 0) {
+      this.state--;
+    }
+  }
+  
+  void move(char direction) {
+    Vector2D oldPos = new Vector2D(this.pos.x, this.pos.z);
+
+    switch (direction) {
+      case 'w': this.pos.z-=3;
+                break;
+      case 's': this.pos.z+=3;
+                break;
+      case 'd': this.pos.x+=3;
+                break;
+      case 'a': this.pos.x-=3;
+                break;
+                
+      case 'i': if (this.b<gameSize) {this.b+=2;}
+                break;
+      case 'k': if (this.b>6) {this.b-=2;}
+                break;
+      case 'l': if (this.w<gameSize) {this.w+=2;}
+                break;
+      case 'j': if (this.w>6) {this.w-=2;}
+                break;
+      case 'o': if (this.h<201) {this.h+=2;}
+                break;
+      case 'u': if (this.h>36) {this.h-=2;}
+                break;
+                
+      case 'b': this.w = 75;
+                break;
+      case 'n': this.h = 75;
+                break;
+      case 'm': this.b = 75;
+                break;
+                
+      default:
+              break;
+    }
+    
+    // Handles collision with obstacles
+    if (!placedObject) {
+      for (int i = 0; i < game.getObstacles().size(); i++) {
+        Vector2D xBound = game.getObstacles().get(i).getXBound();
+        Vector2D zBound = game.getObstacles().get(i).getZBound();
+        
+        if (state != 3) { // If the moving object is not an obstacle
+          if (this.pos.x > xBound.x - 15 && this.pos.x < xBound.z + 25 &&
+              this.pos.z > zBound.x - 25 && this.pos.z < zBound.z + 15) {
+            this.pos.x = oldPos.x;
+            this.pos.z = oldPos.z;
+          }
+        } else if (state == 3) {
+          if (this.pos.x > xBound.x - w*0.5 && this.pos.x < xBound.z + w*0.5 &&
+              this.pos.z > zBound.x - b*0.5 && this.pos.z < zBound.z + b*0.5) {
+            this.pos.x = oldPos.x;
+            this.pos.z = oldPos.z;
+          }
+        }
+      }
+    } else {
+      // used to allow setupAgent to move away from obstacles after
+      // they are placed
+      boolean resetBoolean = true;
+      for (int i = 0; i < game.getObstacles().size(); i++) {
+        Vector2D xBound = game.getObstacles().get(i).getXBound();
+        Vector2D zBound = game.getObstacles().get(i).getZBound();
+        
+        if (state != 3) { // If the moving object is not an obstacle
+          if (this.pos.x > xBound.x - 15 && this.pos.x < xBound.z + 25 &&
+              this.pos.z > zBound.x - 25 && this.pos.z < zBound.z + 15) {
+            resetBoolean = false;
+          }
+        } else if (state == 3) {
+          if (this.pos.x > xBound.x - w*0.5 && this.pos.x < xBound.z + w*0.5 &&
+              this.pos.z > zBound.x - b*0.5 && this.pos.z < zBound.z + b*0.5) {
+            resetBoolean = false;
+          }
+        }
+      }
+      
+      if (resetBoolean) {
+        placedObject = false;
+      }
+    }
+  }
+  
+  void drawSetupAgent() {
+    switch(state) {
+      case 0:  // Draw Sphere
+              pushMatrix();
+              translate(this.pos.x, -15, this.pos.z);
+              fill(255);
+              sphere(10);
+              popMatrix();
+              break;
+      case 1: // Draw Chicken
+              pushMatrix();
+              noStroke();
+              translate(this.pos.x,0,this.pos.z);
+              //rotateY(rotation);
+              fill(225); // white
+              translate(0, -12.5, 0);
+              box(7.5,10,13.5); // body
+              translate(7.5/2, 7.5, 0);
+              fill(225, 225, 0); // yellow
+              box(1.75,10,2.5); // right leg
+              translate(-7.5, 0, 0);
+              box(1.75,10,2.5); // left leg
+              translate(0,4,-2);
+              box(0.5,1.0,2); // left foot middle toe
+              translate(1.2,0,0);
+              rotateY(-0.5);
+              box(0.5,1.0,2); // left foot right toe
+              rotateY(0.5);
+              translate(-2.4,0,0);
+              rotateY(0.5);
+              box(0.5,1.0,2); // left foot left toe
+              rotateY(-0.5);
+              translate(1.2 + 7.5, 0, 0);
+              box(0.5,1.0,2); // right foot middle toe
+              translate(1.2,0,0);
+              rotateY(-0.5);
+              box(0.5,1.0,2); // right foot right toe
+              rotateY(0.5);
+              translate(-2.4,0,0);
+              rotateY(0.5);
+              box(0.5,1.0,2); // right foot left toe
+              rotateY(-0.5);
+              translate(1.2 - 7.5/2, -12.5 - 6.0, -5);
+              fill(225); // white
+              box(3.0,4,8); // head
+              translate(0, 1.75, -4.0);
+              fill(255,0,0); // red
+              box(1.5,3.0,0.8); // gizzard
+              translate(0.5, -2.35, 0);
+              fill(0);
+              box(0.5, 1.0, 0.5); // right eye
+              translate(-1.0, 0, 0);
+              box(0.5, 1.0, 0.5); // left eye
+              translate(0.5, -1, 1);
+              fill(255,0,0); // red
+              box(0.60, 1.2, 1.6);
+              popMatrix();
+              break;
+      case 2: // Draw Wolf
+              pushMatrix();
+              noStroke();
+              translate(this.pos.x,0,this.pos.z);
+              //rotateY(rotation);
+              fill(255,0,0); // white
+              translate(0, -12.5, 0);
+              box(7.5,10,13.5); // body
+              translate(7.5/2, 7.5, 0);
+              fill(225, 225, 0); // yellow
+              box(1.75,10,2.5); // right leg
+              translate(-7.5, 0, 0);
+              box(1.75,10,2.5); // left leg
+              translate(0,4,-2);
+              box(0.5,1.0,2); // left foot middle toe
+              translate(1.2,0,0);
+              rotateY(-0.5);
+              box(0.5,1.0,2); // left foot right toe
+              rotateY(0.5);
+              translate(-2.4,0,0);
+              rotateY(0.5);
+              box(0.5,1.0,2); // left foot left toe
+              rotateY(-0.5);
+              translate(1.2 + 7.5, 0, 0);
+              box(0.5,1.0,2); // right foot middle toe
+              translate(1.2,0,0);
+              rotateY(-0.5);
+              box(0.5,1.0,2); // right foot right toe
+              rotateY(0.5);
+              translate(-2.4,0,0);
+              rotateY(0.5);
+              box(0.5,1.0,2); // right foot left toe
+              rotateY(-0.5);
+              translate(1.2 - 7.5/2, -12.5 - 6.0, -5);
+              fill(225); // white
+              box(3.0,4,8); // head
+              translate(0, 1.75, -4.0);
+              fill(255,0,0); // red
+              box(1.5,3.0,0.8); // gizzard
+              translate(0.5, -2.35, 0);
+              fill(0);
+              box(0.5, 1.0, 0.5); // right eye
+              translate(-1.0, 0, 0);
+              box(0.5, 1.0, 0.5); // left eye
+              translate(0.5, -1, 1);
+              fill(255,0,0); // red
+              box(0.60, 1.2, 1.6);
+              popMatrix();
+              break;
+      case 3: // Draw Obstacle
+              pushMatrix();
+              fill(100,0,0);
+              stroke(255,0,0);
+              translate(pos.x, (-h * 0.5) - 0.15, pos.z);
+              box(w, h, b);
+              popMatrix();
+              break;
+    }
+  }
+
+}
+  
 
 class Player {
   Vector2D pos;
@@ -960,6 +1241,7 @@ class Obstacle {
 
 class Game {
   Player user;
+  SetupAgent setupAgent;
   ArrayList<Wolf> wolves = new ArrayList<Wolf>();
   ArrayList<Obstacle> obstacles = new ArrayList<Obstacle>();
   ArrayList<Chicken> chickens = new ArrayList<Chicken>();
@@ -974,62 +1256,70 @@ class Game {
     
     // Set Obstacles
     //obstacles.add(new Obstacle(this.center.x, this.center.z, 5, 10, 5));
-    // Creating center box
-    obstacles.add(new Obstacle(this.center.x + 150, this.center.z, 5, 200, 200)); // right wall
-    obstacles.add(new Obstacle(this.center.x - 150, this.center.z, 5, 200, 200)); // left wall
-    obstacles.add(new Obstacle(this.center.x, this.center.z - 100, 300, 200, 5)); // back wall
-    obstacles.add(new Obstacle(this.center.x + (150-75*0.5), this.center.z + 100, 75, 200, 5)); // right doorway wall
-    obstacles.add(new Obstacle(this.center.x - (150-75*0.5), this.center.z + 100, 75, 200, 5)); // left doorway wall
-    
     // Creating edge of game
     obstacles.add(new Obstacle(this.center.x + this.size*0.5, this.center.z, 5, 35, this.size)); // right wall
     obstacles.add(new Obstacle(this.center.x - this.size*0.5, this.center.z, 5, 35, this.size)); // left wall
     obstacles.add(new Obstacle(this.center.x, this.center.z + this.size*0.5, this.size, 35, 5)); // front wall
     obstacles.add(new Obstacle(this.center.x, this.center.z - this.size*0.5, this.size, 35, 5)); // back wall
+    // Creating center box
+    if (!cleanGame) {
+      obstacles.add(new Obstacle(this.center.x + 150, this.center.z, 5, 200, 200)); // right wall
+      obstacles.add(new Obstacle(this.center.x - 150, this.center.z, 5, 200, 200)); // left wall
+      obstacles.add(new Obstacle(this.center.x, this.center.z - 100, 300, 200, 5)); // back wall
+      obstacles.add(new Obstacle(this.center.x + (150-75*0.5), this.center.z + 100, 75, 200, 5)); // right doorway wall
+      obstacles.add(new Obstacle(this.center.x - (150-75*0.5), this.center.z + 100, 75, 200, 5)); // left doorway wall
+    }
+    
+    // Setup SetupAgent
+    setupAgent = new SetupAgent(this.center.x, this.center.z + 30);
     
     // Setup user controlled agent
     user = new Player(this.center.x, this.center.z);
     
     // Setup chickens
-    for (int i = 0; i < 100; i++) {
-      float randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
-      float randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
-      boolean viableAgentPlacement = false;
-      while (!viableAgentPlacement) {
-        viableAgentPlacement = true;
-        for (int k = 0; k < obstacles.size(); k++) {
-          Vector2D xBound = obstacles.get(k).getXBound();
-          Vector2D zBound = obstacles.get(k).getZBound();
-          if (randomX > xBound.x - 7 && randomX < xBound.z + 7 &&
-              randomZ > zBound.x - 7 && randomZ < zBound.z + 7) {
-            randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
-            randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
-            viableAgentPlacement = false;
+    if (!cleanGame) {
+      for (int i = 0; i < 100; i++) {
+        float randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
+        float randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
+        boolean viableAgentPlacement = false;
+        while (!viableAgentPlacement) {
+          viableAgentPlacement = true;
+          for (int k = 0; k < obstacles.size(); k++) {
+            Vector2D xBound = obstacles.get(k).getXBound();
+            Vector2D zBound = obstacles.get(k).getZBound();
+            if (randomX > xBound.x - 7 && randomX < xBound.z + 7 &&
+                randomZ > zBound.x - 7 && randomZ < zBound.z + 7) {
+              randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
+              randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
+              viableAgentPlacement = false;
+            }
           }
         }
+        chickens.add(new Chicken(randomX, randomZ));
       }
-      chickens.add(new Chicken(randomX, randomZ));
     }
     
     // Setup wolf
-    for (int i = 0; i < 1; i++) {
-      float randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
-      float randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
-      boolean viableAgentPlacement = false;
-      while (!viableAgentPlacement) {
-        viableAgentPlacement = true;
-        for (int k = 0; k < obstacles.size(); k++) {
-          Vector2D xBound = obstacles.get(k).getXBound();
-          Vector2D zBound = obstacles.get(k).getZBound();
-          if (randomX > xBound.x - 10 && randomX < xBound.z + 10 &&
-              randomZ > zBound.x - 10 && randomZ < zBound.z + 10) {
-            randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
-            randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
-            viableAgentPlacement = false;
+    if (!cleanGame) {
+      for (int i = 0; i < 1; i++) {
+        float randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
+        float randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
+        boolean viableAgentPlacement = false;
+        while (!viableAgentPlacement) {
+          viableAgentPlacement = true;
+          for (int k = 0; k < obstacles.size(); k++) {
+            Vector2D xBound = obstacles.get(k).getXBound();
+            Vector2D zBound = obstacles.get(k).getZBound();
+            if (randomX > xBound.x - 10 && randomX < xBound.z + 10 &&
+                randomZ > zBound.x - 10 && randomZ < zBound.z + 10) {
+              randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
+              randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
+              viableAgentPlacement = false;
+            }
           }
         }
+        wolves.add(new Wolf(randomX, randomZ));
       }
-      wolves.add(new Wolf(randomX, randomZ));
     }
     
     if (gameRunning) {
@@ -1053,8 +1343,88 @@ class Game {
     return this.user;
   }
   
+  SetupAgent getSetupAgent() {
+    return this.setupAgent;
+  }
+  
   ArrayList<Obstacle> getObstacles() {
     return this.obstacles;
+  }
+  
+  void setupAddObject() {
+    int setupAgentState = setupAgent.getState();
+    float agentX = setupAgent.getPos().x;
+    float agentZ = setupAgent.getPos().z;
+    boolean viableAgentPlacement = true;
+    if (!placedObject) {
+      switch(setupAgentState) {
+        case 0: break;
+        case 1: 
+                for (int k = 0; k < obstacles.size(); k++) {
+                  Vector2D xBound = obstacles.get(k).getXBound();
+                  Vector2D zBound = obstacles.get(k).getZBound();
+                  if (agentX > xBound.x - 7 && agentX < xBound.z + 7 &&
+                      agentZ > zBound.x - 7 && agentZ < zBound.z + 7) {
+                    viableAgentPlacement = false;
+                  }
+                }
+                if (viableAgentPlacement) {
+                  chickens.add(new Chicken(agentX, agentZ));
+                }
+                break;
+        case 2: 
+                for (int k = 0; k < obstacles.size(); k++) {
+                  Vector2D xBound = obstacles.get(k).getXBound();
+                  Vector2D zBound = obstacles.get(k).getZBound();
+                  if (agentX > xBound.x - 7 && agentX < xBound.z + 7 &&
+                      agentZ > zBound.x - 7 && agentZ < zBound.z + 7) {
+                    viableAgentPlacement = false;
+                  }
+                }
+                if (viableAgentPlacement) {
+                  wolves.add(new Wolf(agentX, agentZ));
+                }
+                break;
+        case 3: 
+                obstacles.add(new Obstacle(agentX, agentZ, 
+                                           setupAgent.getW(), 
+                                           setupAgent.getH(), 
+                                           setupAgent.getB()));
+                Vector2D xBound = obstacles.get(obstacles.size()-1).getXBound();
+                Vector2D zBound = obstacles.get(obstacles.size()-1).getZBound();
+                
+                // Handles attempt to place obstacle over player
+                if (user.getPos().x > xBound.x - 15 && user.getPos().x < xBound.z + 25 &&
+                    user.getPos().z > zBound.x - 25 && user.getPos().z < zBound.z + 15) {
+                  obstacles.remove(obstacles.size()-1);
+                } else {
+                  placedObject = true;
+                  // Handles the obstacle being placed over chickens
+                  for (int i = 0; i < chickens.size(); i++) {
+                    float chickenX = chickens.get(i).getPos().x;
+                    float chickenZ = chickens.get(i).getPos().z;
+                    if (chickenX > xBound.x - 7 && chickenX < xBound.z + 7 &&
+                        chickenZ > zBound.x - 7 && chickenZ < zBound.z + 7) {
+                      chickens.remove(i);
+                      i--;
+                    }
+                  }
+                  // Handles the obstacle being placed over wolves
+                  for (int i = 0; i < wolves.size(); i++) {
+                    float wolfX = wolves.get(i).getPos().x;
+                    float wolfZ = wolves.get(i).getPos().z;
+                    if (wolfX > xBound.x - 7 && wolfX < xBound.z + 7 &&
+                        wolfZ > zBound.x - 7 && wolfZ < zBound.z + 7) {
+                      wolves.remove(i);
+                      i--;
+                    }
+                  }
+                }
+                break;
+        default:
+                break;
+      }
+    }
   }
   
   void boids() {
@@ -1283,6 +1653,14 @@ class Game {
     // Draws chickens
     for (int i = 0; i < chickens.size(); i++) {
       chickens.get(i).drawChicken();
+    }
+    //
+    /////////////////////////////////////////////////////
+    
+    /////////////////////////////////////////////////////
+    // Draws setupAgent
+    if (gameSetup) {
+      setupAgent.drawSetupAgent();
     }
     //
     /////////////////////////////////////////////////////
