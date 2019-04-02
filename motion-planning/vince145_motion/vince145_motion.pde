@@ -29,10 +29,13 @@ float fov = PI/3.0;
 boolean chickensFollow = false;
 boolean chickenBoid = true;
 boolean wolfAttack = true;
+boolean gameRunning = false;
+boolean gameSetup = true;
 
 float gameSize = 1500;
-float edgeMaxDistance = gameSize/5; // boardSize/10
+float edgeMaxDistance = gameSize/2; // boardSize/10
 int numberOfSampledPoints = 50;
+int inputDelay = 5;
 
 float w = 800;
 float h = 600;
@@ -40,21 +43,9 @@ float dt = 0.001;
 
 Game game = new Game(0.0, 0.0, 0.0, gameSize);
 
-Vector2D tPos1 = new Vector2D(gameSize/2, gameSize/2);
-Vector2D tPos2 = new Vector2D(-gameSize/2, -gameSize/2);
-Vector2D tPos3 = new Vector2D(0,0);
-Vector2D tPos4 = new Vector2D(gameSize/2, 0);
-float tDis = tPos1.d(tPos2).magnitude();
-float tDis2 = tPos1.d(tPos3).magnitude();
-float tDis3 = tPos4.d(tPos3).magnitude();
-
-
 void setup() {
   size(1600, 900, P3D);
   fill(255);
-  println(tDis);
-  println(tDis2);
-  println(tDis3);
   cam = new PeasyCam(this, 500);
   cam.setMinimumDistance(500);
   cam.setMaximumDistance(1000);
@@ -73,20 +64,44 @@ void draw() {
   game.drawGame();
   if (keyPressed == true) {
     handleInput(key);
-    game.getUser().move(key);
+    if (gameRunning) {
+      game.getUser().move(key);
+    }
   }
+  if (inputDelay > 1000) {
+    inputDelay = 100;
+  }
+  inputDelay++;
   
 }
 
 
 void handleInput(char input) {
   switch (input) {
-    case ' ': game = new Game(0.0, 0.0, 0.0, gameSize);
+    case ' ': if (inputDelay >= 20) {
+                game = new Game(0.0, 0.0, 0.0, gameSize);
+                gameRunning = false;
+                gameSetup = true;
+                inputDelay = 0;
+              }
               break;
-    case '1': if (game.getUser().getState() != 1) {
-                game.getUser().setState(1);
-              } else {
-                game.getUser().setState(0);
+    case 'q': if (inputDelay >= 20) {
+                gameRunning = !gameRunning;
+                if (gameSetup) {
+                  gameSetup = false;
+                }
+                inputDelay = 0;
+              }
+              break;
+    case '1': if (inputDelay >= 20) {
+                if (gameRunning) {
+                  if (game.getUser().getState() != 1) {
+                    game.getUser().setState(1);
+                  } else {
+                    game.getUser().setState(0);
+                  }
+                  inputDelay = 0;
+                }
               }
               break;        
     default:
@@ -546,7 +561,7 @@ class Wolf {
     this.pathIndex = 0;
     this.rotation = 0;
     this.animationFrame = 0;
-    this.speed = 600;
+    this.speed = 2400;
   }
   
   Vector2D getPos() {
@@ -559,50 +574,26 @@ class Wolf {
   
   void setPath(ArrayList<Milestone> newPath) {
     this.path = newPath;
+    this.pathIndex = 0;
   }
   
   void update() {
     
     if (wolfAttack) {
-      float distMin = 15.0;
-      if (path.size() >= 1 && pathIndex == path.size()-1) {
+      if (pathIndex != path.size()) {
         Vector2D dist = path.get(pathIndex).getPos().d(this.pos);
-        println(dist.x + "    " + dist.z);
-        if (dist.magnitude() < 27.5) {
-          if (path.get(pathIndex).getType() == 0) {
-            path.get(pathIndex).setType(3);
-            pathIndex++;
-          }
-          vel.reset();
-        } else if (dist.magnitude() > distMin) {
-            dist.divide(dist.magnitude());
-            // Handles direction and speed toward path milestone
-            dist.scaler(this.speed * 2.75);
-            vel = dist;
-        } else {
-            dist.scaler(this.speed * 1.5);
-            vel = dist;
-        }
-        pos.addV(vel.scalerNC(dt));
-      } else if (pathIndex != path.size()) {
-        Vector2D dist = path.get(pathIndex).getPos().d(this.pos);
+        
         if (dist.magnitude() < 1) {
-          if (path.get(pathIndex).getType() == 0) {
-            path.get(pathIndex).setType(3);
-            pathIndex++;
-          }
+          pathIndex++;
+          vel.reset();
         }
-        if (dist.magnitude() > distMin) {
-          dist.divide(dist.magnitude());
-          // Handles direction and speed toward path milestone
-          dist.scaler(this.speed * 2.75);
-          vel = dist;
-        } else {
-          dist.scaler(this.speed * 1.5);
-          vel = dist;
-        } 
+        
+        dist.divide(dist.magnitude());
+        dist.scaler(this.speed);
+        vel = dist;
+      } else {
+        vel.reset();
       }
-      
     }
     
     pos.addV(vel.scalerNC(dt));
@@ -840,17 +831,6 @@ class Chicken {
     for (int i = 0; i < game.getObstacles().size(); i++) {
       Vector2D xBound = game.getObstacles().get(i).getXBound();
       Vector2D zBound = game.getObstacles().get(i).getZBound();
-      
-      /*
-      if (pos.x > xBound.x && pos.x < xBound.z) {
-        vel.x *= -1;
-
-      } 
-      if (pos.z > zBound.x && pos.z < zBound.z) {
-        vel.z *= -1;
-      }
-      */
-      
       if (pos.x > xBound.x - 5 && pos.x < xBound.z + 5 &&
           pos.z > zBound.x - 5 && pos.z < zBound.z + 5) {
         vel.x *= -1.3;
@@ -992,37 +972,6 @@ class Game {
     this.size = startSize;
     this.searchTimer = 0;
     
-    // Setup user controlled agent
-    user = new Player(this.center.x, this.center.z);
-    
-    // Setup chickens
-    for (int i = 0; i < 100; i++) {
-      float randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
-      float randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
-      chickens.add(new Chicken(randomX, randomZ));
-    }
-    
-    // Setup wolf
-    for (int i = 0; i < 1; i++) {
-      float randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
-      float randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
-      wolves.add(new Wolf(randomX, randomZ));
-    }
-    
-    // Chickens will attempt to follow the player if turned on
-    if (chickensFollow) {
-      for (int i = 0; i < chickens.size(); i++) {
-        chickens.get(i).setPath(PRM(chickens.get(i)));
-      }
-    }
-    
-    // Wolves will attempt to follow the player if turned on
-    if (wolfAttack) {
-      for (int i = 0; i < wolves.size(); i++) {
-        wolves.get(i).setPath(WolfPRM(wolves.get(i)));
-      }
-    }
-    
     // Set Obstacles
     //obstacles.add(new Obstacle(this.center.x, this.center.z, 5, 10, 5));
     // Creating center box
@@ -1037,6 +986,67 @@ class Game {
     obstacles.add(new Obstacle(this.center.x - this.size*0.5, this.center.z, 5, 35, this.size)); // left wall
     obstacles.add(new Obstacle(this.center.x, this.center.z + this.size*0.5, this.size, 35, 5)); // front wall
     obstacles.add(new Obstacle(this.center.x, this.center.z - this.size*0.5, this.size, 35, 5)); // back wall
+    
+    // Setup user controlled agent
+    user = new Player(this.center.x, this.center.z);
+    
+    // Setup chickens
+    for (int i = 0; i < 100; i++) {
+      float randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
+      float randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
+      boolean viableAgentPlacement = false;
+      while (!viableAgentPlacement) {
+        viableAgentPlacement = true;
+        for (int k = 0; k < obstacles.size(); k++) {
+          Vector2D xBound = obstacles.get(k).getXBound();
+          Vector2D zBound = obstacles.get(k).getZBound();
+          if (randomX > xBound.x - 7 && randomX < xBound.z + 7 &&
+              randomZ > zBound.x - 7 && randomZ < zBound.z + 7) {
+            randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
+            randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
+            viableAgentPlacement = false;
+          }
+        }
+      }
+      chickens.add(new Chicken(randomX, randomZ));
+    }
+    
+    // Setup wolf
+    for (int i = 0; i < 1; i++) {
+      float randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
+      float randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
+      boolean viableAgentPlacement = false;
+      while (!viableAgentPlacement) {
+        viableAgentPlacement = true;
+        for (int k = 0; k < obstacles.size(); k++) {
+          Vector2D xBound = obstacles.get(k).getXBound();
+          Vector2D zBound = obstacles.get(k).getZBound();
+          if (randomX > xBound.x - 10 && randomX < xBound.z + 10 &&
+              randomZ > zBound.x - 10 && randomZ < zBound.z + 10) {
+            randomX = random(this.center.x-this.size*0.45, this.center.x+this.size*0.45);
+            randomZ = random(this.center.y-this.size*0.45, this.center.y+this.size*0.45);
+            viableAgentPlacement = false;
+          }
+        }
+      }
+      wolves.add(new Wolf(randomX, randomZ));
+    }
+    
+    if (gameRunning) {
+      // Chickens will attempt to follow the player if turned on
+      if (chickensFollow) {
+        for (int i = 0; i < chickens.size(); i++) {
+          chickens.get(i).setPath(PRM(chickens.get(i)));
+        }
+      }
+      
+      // Wolves will attempt to follow the player if turned on
+      if (wolfAttack) {
+        for (int i = 0; i < wolves.size(); i++) {
+          wolves.get(i).setPath(WolfPRM(wolves.get(i)));
+        }
+      }
+    }
   }
   
   Player getUser() {
@@ -1205,60 +1215,61 @@ class Game {
     //
     /////////////////////////////////////////////////////
     
-    
-    /////////////////////////////////////////////////////
-    // Update chickens
-    for (int i = 0; i < chickens.size(); i++) {
-      chickens.get(i).update();
-    }
-    
-    // Chickens will attempt to follow the player if turned on
-    if (chickensFollow) {
-      if (searchTimer == 100) {
-        for (int i = 0; i < chickens.size(); i++) {
-          chickens.get(i).setPath(PRM(chickens.get(i)));
-        }
-        searchTimer = 0;
-      } else {
-        searchTimer++;
-      }
-    }
-    
-    // Update wolves
-    for (int i = 0; i < wolves.size(); i++) {
-      wolves.get(i).update();
-    }
-    
-    
-    // Wolves will attempt to attack chickens if turned on
-    if (wolfAttack) {
-      if (searchTimer == 20) {
-        for (int i = 0; i < wolves.size(); i++) {
-          wolves.get(i).setPath(WolfPRM(wolves.get(i)));
-        }
-        searchTimer = 0;
-      } else {
-        searchTimer++;
+    if (gameRunning) {
+      /////////////////////////////////////////////////////
+      // Update chickens
+      for (int i = 0; i < chickens.size(); i++) {
+        chickens.get(i).update();
       }
       
+      // Chickens will attempt to follow the player if turned on
+      if (chickensFollow) {
+        if (searchTimer == 100) {
+          for (int i = 0; i < chickens.size(); i++) {
+            chickens.get(i).setPath(PRM(chickens.get(i)));
+          }
+          searchTimer = 0;
+        } else {
+          searchTimer++;
+        }
+      }
+      
+      // Update wolves
       for (int i = 0; i < wolves.size(); i++) {
-        for (int j = 0; j < chickens.size(); j++) {
-          Vector2D dist = chickens.get(j).getPos().d(wolves.get(i).getPos());
-          float distM = dist.magnitude();
-          if (distM < 20.0) {
-            chickens.remove(j);
+        wolves.get(i).update();
+      }
+      
+      
+      // Wolves will attempt to attack chickens if turned on
+      if (wolfAttack) {
+        if (searchTimer == 20) {
+          for (int i = 0; i < wolves.size(); i++) {
             wolves.get(i).setPath(WolfPRM(wolves.get(i)));
+          }
+          searchTimer = 0;
+        } else {
+          searchTimer++;
+        }
+        
+        for (int i = 0; i < wolves.size(); i++) {
+          for (int j = 0; j < chickens.size(); j++) {
+            Vector2D dist = chickens.get(j).getPos().d(wolves.get(i).getPos());
+            float distM = dist.magnitude();
+            if (distM < 20.0) {
+              chickens.remove(j);
+              wolves.get(i).setPath(WolfPRM(wolves.get(i)));
+            }
           }
         }
       }
+      
+      // Chickens will flock if turned on
+      if (chickenBoid) {
+        this.boids();
+      }
+      //
+      /////////////////////////////////////////////////////
     }
-    
-    // Chickens will flock if turned on
-    if (chickenBoid) {
-      this.boids();
-    }
-    //
-    /////////////////////////////////////////////////////
     
     /////////////////////////////////////////////////////
     // Draws obstacles
@@ -1357,12 +1368,12 @@ class Game {
       milestones.add(new Milestone(randomX, randomZ, 0));
     }
     
-    // Create source milestone
-    milestones.add(new Milestone(agent.getPos().x, agent.getPos().z, 0));
     // Create goal milestone
     for (int i = 0; i < chickens.size(); i++) {
       milestones.add(new Milestone(chickens.get(i).getPos().x, chickens.get(i).getPos().z, 2));
     }
+    // Create source milestone
+    milestones.add(new Milestone(agent.getPos().x, agent.getPos().z, 0));
     
     // Straight lines connect neighboring milestones
     for (int i = 0; i < milestones.size(); i++) {
@@ -1376,10 +1387,10 @@ class Game {
             Vector2D pointB = milestones.get(j).getPos();
             Vector2D xBound = obstacles.get(k).getXBound();
             Vector2D zBound = obstacles.get(k).getZBound();
-            Vector2D endPointA = new Vector2D(xBound.x, zBound.x);
-            Vector2D endPointB = new Vector2D(xBound.z, zBound.x);
-            Vector2D endPointC = new Vector2D(xBound.z, zBound.z);
-            Vector2D endPointD = new Vector2D(xBound.x, zBound.z);
+            Vector2D endPointA = new Vector2D(xBound.x - 10, zBound.x + 10);
+            Vector2D endPointB = new Vector2D(xBound.z - 10, zBound.x + 10);
+            Vector2D endPointC = new Vector2D(xBound.z - 10, zBound.z + 10);
+            Vector2D endPointD = new Vector2D(xBound.x - 10, zBound.z + 10);
             
             if (linesIntersect(pointA, pointB, endPointA, endPointB)) {
               addEdge = false;
@@ -1402,12 +1413,23 @@ class Game {
     }
     
     // Create source milestone index
-    int agentMilestone = milestones.size()-2;
+    int agentMilestone = milestones.size()-1;
     // Create goal milestone index
-    int goalMilestone = milestones.size()-1;
+    int goalMilestone = 0;
+
     
     // Perform search algorithm
     dijkstraResult djikstraR = dijkstra(milestones, paths, milestones.get(agentMilestone));
+    
+    // Finds closest goal to go after
+    float shortestDist = djikstraR.dist[0];
+    for (int i = 0; i < milestones.size() - 1; i++) {
+      if (djikstraR.dist[i] < shortestDist && (milestones.get(i).getType() == 2)) {
+        shortestDist = djikstraR.dist[i];
+        goalMilestone = i;
+      }
+      
+    }
     
     ArrayList<Milestone> agentPath = new ArrayList<Milestone>();
     agentPath.add(milestones.get(goalMilestone));
