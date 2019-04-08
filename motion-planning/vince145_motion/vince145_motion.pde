@@ -26,17 +26,17 @@ PeasyCam cam;
 float fov = PI/3.0;
 
 
-boolean chickensFollow = false;
 boolean chickenBoid = true;
 boolean wolfAttack = true;
 boolean gameRunning = false;
 boolean gameSetup = true;
 boolean cleanGame = false;
+boolean gameOver = false;
 
 boolean placedObject = false;
 float gameSize = 1500;
 float edgeMaxDistance = gameSize/2; // boardSize/10
-int numberOfSampledPoints = 50;
+int numberOfSampledPoints = 20;
 int inputDelay = 5;
 
 float w = 800;
@@ -50,7 +50,8 @@ void setup() {
   fill(255);
   cam = new PeasyCam(this, 500);
   cam.setMinimumDistance(500);
-  cam.setMaximumDistance(1000);
+  cam.setMaximumDistance(1500);
+  textSize(32);
 }
 
 void draw() {
@@ -86,6 +87,7 @@ void handleInput(char input) {
                 gameRunning = false;
                 gameSetup = true;
                 cleanGame = false;
+                gameOver = false;
                 game = new Game(0.0, 0.0, 0.0, gameSize);
                 inputDelay = 0;
               }
@@ -94,11 +96,12 @@ void handleInput(char input) {
                 gameRunning = false;
                 gameSetup = true;
                 cleanGame = true;
+                gameOver = false;
                 game = new Game(0.0, 0.0, 0.0, gameSize);
                 inputDelay = 0;
               }
               break;
-    case 'z': if (inputDelay >= 20) {
+    case 'z': if (inputDelay >= 20 && !gameOver) {
                 gameRunning = !gameRunning;
                 if (gameSetup) {
                   gameSetup = false;
@@ -106,7 +109,7 @@ void handleInput(char input) {
                 inputDelay = 0;
               }
               break;
-    case '1': if (inputDelay >= 20) {
+    case '1': if (inputDelay >= 20 && !gameOver) {
                 if (gameRunning) {
                   if (game.getUser().getState() != 1) {
                     game.getUser().setState(1);
@@ -493,7 +496,7 @@ class SetupAgent {
   }
   
   void stateInc() {
-    if (this.state < 3) {
+    if (this.state < 4) {
       this.state++;
     }
   }
@@ -701,6 +704,30 @@ class SetupAgent {
               stroke(255,0,0);
               translate(pos.x, (-h * 0.5) - 0.15, pos.z);
               box(w, h, b);
+              popMatrix();
+              break;
+      case 4: // Draw Chicken Pen
+              fill(139,69,19);
+              stroke(0,0,0);
+              // right wall
+              pushMatrix();
+              translate(pos.x + w * 0.5 - 2.5, (-h * 0.5) - 0.15, pos.z);
+              box(5, h, b);
+              popMatrix();
+              // left wall
+              pushMatrix();
+              translate(pos.x - w * 0.5 + 2.5, (-h * 0.5) - 0.15, pos.z);
+              box(5, h, b);
+              popMatrix();
+              // front wall
+              pushMatrix();
+              translate(pos.x, (-h * 0.5) - 0.15, pos.z + b * 0.5 - 2.5);
+              box(w, h, 5);
+              popMatrix();
+              // back wall
+              pushMatrix();
+              translate(pos.x, (-h * 0.5) - 0.15, pos.z - b * 0.5 + 2.5);
+              box(w, h, 5);
               popMatrix();
               break;
     }
@@ -972,6 +999,8 @@ class Chicken {
   int pathIndex;
   float rotation;
   int animationFrame;
+  boolean chickenInPen;
+  int penNumber;
   
   Chicken(float startX, float startZ) {
     this.pos = new Vector2D(startX, startZ);
@@ -979,6 +1008,8 @@ class Chicken {
     this.pathIndex = 0;
     this.rotation = 0;
     this.animationFrame = 0;
+    this.chickenInPen = false;
+    this.penNumber = -1;
   }
   
   Vector2D getPos() {
@@ -989,106 +1020,15 @@ class Chicken {
     return this.vel;
   }
   
+  boolean inPen() {
+    return chickenInPen;
+  }
+  
   void setPath(ArrayList<Milestone> newPath) {
     this.path = newPath;
   }
   
   void update() {
-    
-    if (chickensFollow) {
-      float distMin = 15.0;
-      if (path.size() >= 1 && pathIndex == path.size()-1) {
-        Vector2D dist = path.get(pathIndex).getPos().d(this.pos);
-        println(dist.x + "    " + dist.z);
-        if (dist.magnitude() < 27.5) {
-          if (path.get(pathIndex).getType() == 0) {
-            path.get(pathIndex).setType(3);
-            pathIndex++;
-          }
-          vel.reset();
-        } else if (dist.magnitude() > gameSize * 0.0025) { // fix gamesize scaling
-            if (dist.x > 0 && dist.z < distMin && dist.z > -1.0*distMin) {
-              dist.divide(dist.magnitude());
-              rotation = -PI/2;
-            } else if (dist.x < 0 && dist.z < distMin && dist.z > -1.0*distMin) {
-              dist.divide(dist.magnitude());
-              rotation = PI/2;
-            } else if (dist.x < distMin && dist.x > -1.0*distMin && dist.z > 0) {
-              dist.divide(dist.magnitude());
-              rotation = PI;
-            } else if (dist.x < distMin && dist.x > -1.0*distMin && dist.z < 0) {
-              dist.divide(dist.magnitude());
-              rotation = 0;
-            } else if (dist.x > 0 && dist.z > 0) {
-              dist.divide(dist.magnitude());
-              rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
-            } else if (dist.x > 0 && dist.z < 0) {
-              dist.divide(dist.magnitude());
-              rotation = atan(dist.z/(dist.x + 0.0001));
-            } else if (dist.x < 0 && dist.z > 0) {
-              dist.divide(dist.magnitude());
-              rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
-            } else if (dist.x < 0 && dist.z < 0) {
-              dist.divide(dist.magnitude());
-              rotation = atan(dist.z/(dist.x + 0.0001)) + 2*PI;
-            } else {
-              dist.divide(dist.magnitude());
-            }
-            // Handles direction and speed toward path milestone
-            dist.scaler(gameSize * 2.75);
-            vel = dist;
-        } else {
-            dist.scaler(gameSize * 0.625);
-            vel = dist;
-        }
-        pos.addV(vel.scalerNC(dt));
-      } else if (pathIndex != path.size()) {
-        Vector2D dist = path.get(pathIndex).getPos().d(this.pos);
-        if (dist.magnitude() < 1) {
-          if (path.get(pathIndex).getType() == 0) {
-            path.get(pathIndex).setType(3);
-            pathIndex++;
-          }
-        }
-        // Manages rotating the chicken
-        if (dist.magnitude() > gameSize * 0.0025) {
-          if (dist.x > 0 && dist.z < distMin && dist.z > -1.0*distMin) {
-            dist.divide(dist.magnitude());
-            rotation = -PI/2;
-          } else if (dist.x < 0 && dist.z < distMin && dist.z > -1.0*distMin) {
-            dist.divide(dist.magnitude());
-            rotation = PI/2;
-          } else if (dist.x < distMin && dist.x > -1.0*distMin && dist.z > 0) {
-            dist.divide(dist.magnitude());
-            rotation = PI;
-          } else if (dist.x < distMin && dist.x > -1.0*distMin && dist.z < 0) {
-            dist.divide(dist.magnitude());
-            rotation = 0;
-          } else if (dist.x > 0 && dist.z > 0) {
-            dist.divide(dist.magnitude());
-            rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
-          } else if (dist.x > 0 && dist.z < 0) {
-            dist.divide(dist.magnitude());
-            rotation = atan(dist.z/(dist.x + 0.0001));
-          } else if (dist.x < 0 && dist.z > 0) {
-            dist.divide(dist.magnitude());
-            rotation = atan(dist.z/(dist.x + 0.0001)) + PI;
-          } else if (dist.x < 0 && dist.z < 0) {
-            dist.divide(dist.magnitude());
-            rotation = atan(dist.z/(dist.x + 0.0001)) + 2*PI;
-          } else {
-            dist.divide(dist.magnitude());
-          }
-          // Handles direction and speed toward path milestone
-          dist.scaler(gameSize * 2.75);
-          vel = dist;
-        } else {
-          dist.scaler(gameSize * 0.625);
-          vel = dist;
-        } 
-      }
-      
-    }
     
     pos.addV(vel.scalerNC(dt));
     
@@ -1118,6 +1058,29 @@ class Chicken {
         vel.z *= -1.3;
         pos.addV(vel.scalerNC(dt*2.0));
       } 
+    }
+    
+    // Handles collision with chicken Pens
+    if (!chickenInPen) {
+      for (int i = 0; i < game.getChickenPens().size(); i++) {
+        Vector2D xBound = game.getChickenPens().get(i).getXBound();
+        Vector2D zBound = game.getChickenPens().get(i).getZBound();
+        if (pos.x > xBound.x + 5 && pos.x < xBound.z - 5 &&
+            pos.z > zBound.x + 5 && pos.z < zBound.z - 5) {
+          chickenInPen = true;
+          penNumber = i;
+        } 
+      }
+    }
+    if (chickenInPen) {
+      Vector2D xBound = game.getChickenPens().get(penNumber).getXBound();
+      Vector2D zBound = game.getChickenPens().get(penNumber).getZBound();
+      if (!(pos.x > xBound.x + 5 && pos.x < xBound.z - 5 &&
+          pos.z > zBound.x + 5 && pos.z < zBound.z - 5)) {
+        vel.x *= -1.3;
+        vel.z *= -1.3;
+        pos.addV(vel.scalerNC(dt*0.999));
+      }
     }
     
     float velMin = 0.1;
@@ -1239,20 +1202,99 @@ class Obstacle {
   }
 }
 
+class ChickenPen {
+  Vector2D pos;
+  float w;
+  float b;
+  float h;
+  
+  ChickenPen(float startX, float startZ, float startW, float startH, float startB) {
+    this.pos = new Vector2D(startX, startZ);
+    this.w = startW;
+    this.b = startB;
+    this.h = startH;
+  }
+  
+  Vector2D getPos() {
+    return this.pos;
+  }
+  
+  float getW() {
+    return this.w;
+  }
+  
+  float getH() {
+    return this.h;
+  }
+  
+  Vector2D getXBound() {
+    Vector2D resultXBound = new Vector2D(this.pos.x - this.w * 0.5,
+                                         this.pos.x + this.w * 0.5);
+    return resultXBound;
+  }
+  
+  Vector2D getZBound() {
+    Vector2D resultZBound = new Vector2D(this.pos.z - this.b * 0.5,
+                                         this.pos.z + this.b * 0.5);
+    return resultZBound;
+  }
+  /*
+      obstacles.add(new Obstacle(this.center.x + 150, this.center.z, 5, 200, 200)); // right wall
+      obstacles.add(new Obstacle(this.center.x - 150, this.center.z, 5, 200, 200)); // left wall
+      obstacles.add(new Obstacle(this.center.x, this.center.z - 100, 300, 200, 5)); // back wall
+      obstacles.add(new Obstacle(this.center.x + (150-75*0.5), this.center.z + 100, 75, 200, 5)); // right doorway wall
+      obstacles.add(new Obstacle(this.center.x - (150-75*0.5), this.center.z + 100, 75, 200, 5)); // left doorway wall
+  */
+  void drawChickenPen() {
+    fill(139,69,19);
+    stroke(0,0,0);
+    // right wall
+    pushMatrix();
+    translate(pos.x + w * 0.5 - 2.5, (-h * 0.5) - 0.15, pos.z);
+    box(5, h, b);
+    popMatrix();
+    // left wall
+    pushMatrix();
+    translate(pos.x - w * 0.5 + 2.5, (-h * 0.5) - 0.15, pos.z);
+    box(5, h, b);
+    popMatrix();
+    // front wall
+    pushMatrix();
+    translate(pos.x, (-h * 0.5) - 0.15, pos.z + b * 0.5 - 2.5);
+    box(w, h, 5);
+    popMatrix();
+    // back wall
+    pushMatrix();
+    translate(pos.x, (-h * 0.5) - 0.15, pos.z - b * 0.5 + 2.5);
+    box(w, h, 5);
+    popMatrix();
+  }
+}
+
 class Game {
   Player user;
   SetupAgent setupAgent;
   ArrayList<Wolf> wolves = new ArrayList<Wolf>();
   ArrayList<Obstacle> obstacles = new ArrayList<Obstacle>();
+  ArrayList<ChickenPen> chickenPens = new ArrayList<ChickenPen>();
   ArrayList<Chicken> chickens = new ArrayList<Chicken>();
+  ArrayList<Milestone> PRM_Map = new ArrayList<Milestone>();
+  boolean generateNewMap;
+  int mapTimer;
   float size;
   Vector3D center;
   int searchTimer;
+  int chickensEatten;
+  int chickensSafe;
   
   Game(float startX, float startY, float startZ, float startSize) {
     this.center = new Vector3D(startX, startY, startZ);
     this.size = startSize;
     this.searchTimer = 0;
+    this.mapTimer = 0;
+    this.generateNewMap = true;
+    this.chickensEatten = 0;
+    this.chickensSafe = 0;
     
     // Set Obstacles
     //obstacles.add(new Obstacle(this.center.x, this.center.z, 5, 10, 5));
@@ -1269,6 +1311,9 @@ class Game {
       obstacles.add(new Obstacle(this.center.x + (150-75*0.5), this.center.z + 100, 75, 200, 5)); // right doorway wall
       obstacles.add(new Obstacle(this.center.x - (150-75*0.5), this.center.z + 100, 75, 200, 5)); // left doorway wall
     }
+    
+    // Set ChickenPen
+    chickenPens.add(new ChickenPen(this.center.x, this.center.z, 300, 40, 200)); // right wall
     
     // Setup SetupAgent
     setupAgent = new SetupAgent(this.center.x, this.center.z + 30);
@@ -1323,14 +1368,7 @@ class Game {
     }
     
     if (gameRunning) {
-      // Chickens will attempt to follow the player if turned on
-      if (chickensFollow) {
-        for (int i = 0; i < chickens.size(); i++) {
-          chickens.get(i).setPath(PRM(chickens.get(i)));
-        }
-      }
-      
-      // Wolves will attempt to follow the player if turned on
+      // Wolves will attempt to eat chickens if turned on
       if (wolfAttack) {
         for (int i = 0; i < wolves.size(); i++) {
           wolves.get(i).setPath(WolfPRM(wolves.get(i)));
@@ -1351,6 +1389,10 @@ class Game {
     return this.obstacles;
   }
   
+  ArrayList<ChickenPen> getChickenPens() {
+    return this.chickenPens;
+  }
+  
   void setupAddObject() {
     int setupAgentState = setupAgent.getState();
     float agentX = setupAgent.getPos().x;
@@ -1360,6 +1402,7 @@ class Game {
       switch(setupAgentState) {
         case 0: break;
         case 1: 
+                // Checks ot make sure chickens are not placed in obstacles
                 for (int k = 0; k < obstacles.size(); k++) {
                   Vector2D xBound = obstacles.get(k).getXBound();
                   Vector2D zBound = obstacles.get(k).getZBound();
@@ -1373,9 +1416,19 @@ class Game {
                 }
                 break;
         case 2: 
+                // Checks to make sure wolves are not placed in obstacles
                 for (int k = 0; k < obstacles.size(); k++) {
                   Vector2D xBound = obstacles.get(k).getXBound();
                   Vector2D zBound = obstacles.get(k).getZBound();
+                  if (agentX > xBound.x - 7 && agentX < xBound.z + 7 &&
+                      agentZ > zBound.x - 7 && agentZ < zBound.z + 7) {
+                    viableAgentPlacement = false;
+                  }
+                }
+                // Checks to make sure wolves are not placed in chicken pens
+                for (int k = 0; k < chickenPens.size(); k++) {
+                  Vector2D xBound = chickenPens.get(k).getXBound();
+                  Vector2D zBound = chickenPens.get(k).getZBound();
                   if (agentX > xBound.x - 7 && agentX < xBound.z + 7 &&
                       agentZ > zBound.x - 7 && agentZ < zBound.z + 7) {
                     viableAgentPlacement = false;
@@ -1415,6 +1468,44 @@ class Game {
                     float wolfZ = wolves.get(i).getPos().z;
                     if (wolfX > xBound.x - 7 && wolfX < xBound.z + 7 &&
                         wolfZ > zBound.x - 7 && wolfZ < zBound.z + 7) {
+                      wolves.remove(i);
+                      i--;
+                    }
+                  }
+                }
+                break;
+        case 4: 
+                chickenPens.add(new ChickenPen(agentX, agentZ, 
+                                           setupAgent.getW(), 
+                                           setupAgent.getH(), 
+                                           setupAgent.getB()));
+                Vector2D xBound2 = chickenPens.get(chickenPens.size()-1).getXBound();
+                Vector2D zBound2 = chickenPens.get(chickenPens.size()-1).getZBound();
+                
+                // Handles attempt to place obstacle over player
+                if (user.getPos().x > xBound2.x - 15 && user.getPos().x < xBound2.z + 25 &&
+                    user.getPos().z > zBound2.x - 25 && user.getPos().z < zBound2.z + 15) {
+                  //chickenPens.remove(chickenPens.size()-1);
+                } else {
+                  placedObject = true;
+                  // Handles the obstacle being placed over chickens
+                  /*
+                  for (int i = 0; i < chickens.size(); i++) {
+                    float chickenX = chickens.get(i).getPos().x;
+                    float chickenZ = chickens.get(i).getPos().z;
+                    if (chickenX > xBound.x - 7 && chickenX < xBound.z + 7 &&
+                        chickenZ > zBound.x - 7 && chickenZ < zBound.z + 7) {
+                      chickens.remove(i);
+                      i--;
+                    }
+                  }
+                  */
+                  // Handles the obstacle being placed over wolves
+                  for (int i = 0; i < wolves.size(); i++) {
+                    float wolfX = wolves.get(i).getPos().x;
+                    float wolfZ = wolves.get(i).getPos().z;
+                    if (wolfX > xBound2.x - 7 && wolfX < xBound2.z + 7 &&
+                        wolfZ > zBound2.x - 7 && wolfZ < zBound2.z + 7) {
                       wolves.remove(i);
                       i--;
                     }
@@ -1572,6 +1663,14 @@ class Game {
   
   void drawGame() {
     
+    
+    if (gameOver) {
+      stroke(0);
+      fill(0);
+      text("Chickens Saved: " + chickensSafe , -140, -500, -250);
+      text("Chickens Eatten: " + chickensEatten, -140, -450, -250);
+    }
+    
     /////////////////////////////////////////////////////
     // Draws floor
     stroke(255,0,0);
@@ -1587,21 +1686,26 @@ class Game {
     
     if (gameRunning) {
       /////////////////////////////////////////////////////
+      // Check if game over
+      boolean endGame = true;
+      
+      chickensSafe = 0;
+      for (int i = 0; i < chickens.size(); i++) {
+        if (!chickens.get(i).inPen()) {
+          endGame = false;
+        } else {
+          chickensSafe++;
+        }
+      }
+      // Ends game when all chickens are eatten or safe
+      if (endGame) {
+        gameOver = true;
+        gameRunning = false;
+      }
+      
       // Update chickens
       for (int i = 0; i < chickens.size(); i++) {
         chickens.get(i).update();
-      }
-      
-      // Chickens will attempt to follow the player if turned on
-      if (chickensFollow) {
-        if (searchTimer == 100) {
-          for (int i = 0; i < chickens.size(); i++) {
-            chickens.get(i).setPath(PRM(chickens.get(i)));
-          }
-          searchTimer = 0;
-        } else {
-          searchTimer++;
-        }
       }
       
       // Update wolves
@@ -1617,16 +1721,25 @@ class Game {
             wolves.get(i).setPath(WolfPRM(wolves.get(i)));
           }
           searchTimer = 0;
+          if (mapTimer == 4) {
+            generateNewMap = true;
+            mapTimer = 0;
+          } else {
+            mapTimer++;
+          }
         } else {
           searchTimer++;
         }
         
+        // Handle wolves collisions with chickens
         for (int i = 0; i < wolves.size(); i++) {
           for (int j = 0; j < chickens.size(); j++) {
             Vector2D dist = chickens.get(j).getPos().d(wolves.get(i).getPos());
             float distM = dist.magnitude();
             if (distM < 20.0) {
               chickens.remove(j);
+              chickensEatten++;
+              // Reupdate wolf's goal after old goal has been achieved
               wolves.get(i).setPath(WolfPRM(wolves.get(i)));
             }
           }
@@ -1645,6 +1758,14 @@ class Game {
     // Draws obstacles
     for (int i = 0; i < obstacles.size(); i++) {
       obstacles.get(i).drawObstacle();
+    }
+    //
+    /////////////////////////////////////////////////////
+    
+    /////////////////////////////////////////////////////
+    // Draws chickenPens
+    for (int i = 0; i < chickenPens.size(); i++) {
+      chickenPens.get(i).drawChickenPen();
     }
     //
     /////////////////////////////////////////////////////
@@ -1680,71 +1801,43 @@ class Game {
     /////////////////////////////////////////////////////
   }
   
-  
-  ArrayList<Milestone> PRM(Chicken agent) {
-    
-    ArrayList<Milestone> milestones = new ArrayList<Milestone>();
-    ArrayList<Edge> paths = new ArrayList<Edge>();
+  ArrayList<Milestone> WolfPRM(Wolf agent) {
     
     // Sample random points
-    for (int i = 0; i < numberOfSampledPoints; i++) {
-      // Randomly sample configurations
-      float randomX =  random(center.x - size * 0.5, center.x + size * 0.5);
-      float randomZ =  random(center.z - size * 0.5, center.z + size * 0.5);
-      milestones.add(new Milestone(randomX, randomZ, 0));
-    }
-    
-    // Create source milestone
-    milestones.add(new Milestone(agent.getPos().x, agent.getPos().z, 0));
-    // Create goal milestone
-    milestones.add(new Milestone(user.getPos().x, user.getPos().z, 2));
-    
-    // Straight lines connect neighboring milestones
-    for (int i = 0; i < milestones.size(); i++) {
-      for (int j = 0; j < milestones.size(); j++) {
-        float dist = abs((milestones.get(j).getPos().x - milestones.get(i).getPos().x));
-        dist += abs((milestones.get(j).getPos().z - milestones.get(i).getPos().z));
-        if (dist < edgeMaxDistance && dist > 0) {
-          paths.add(new Edge(milestones.get(i), milestones.get(j), dist));
+    if (generateNewMap) {
+      PRM_Map.clear();
+      for (int i = 0; i < numberOfSampledPoints; i++) {
+        // Randomly sample configurations
+        float randomX =  random(center.x - size * 0.5, center.x + size * 0.5);
+        float randomZ =  random(center.z - size * 0.5, center.z + size * 0.5);
+        boolean validMilestone = true;
+        // Check if sampled point is inside an obstacle
+        for (int k = 0; k < obstacles.size(); k++) {
+          Vector2D xBound = obstacles.get(k).getXBound();
+          Vector2D zBound = obstacles.get(k).getZBound();
+          
+          if (randomX > xBound.x - 5 && randomX < xBound.z + 5 &&
+              randomZ > zBound.x - 5 && randomZ < zBound.z + 5) {
+            validMilestone = false;
+          } 
+        }
+        // Check if sampled point is inside an chicken pen
+        for (int k = 0; k < chickenPens.size(); k++) {
+          Vector2D xBound = chickenPens.get(k).getXBound();
+          Vector2D zBound = chickenPens.get(k).getZBound();
+          
+          if (randomX > xBound.x - 5 && randomX < xBound.z + 5 &&
+              randomZ > zBound.x - 5 && randomZ < zBound.z + 5) {
+            validMilestone = false;
+          } 
+        }
+        if (validMilestone) {
+          PRM_Map.add(new Milestone(randomX, randomZ, 0));
         }
       }
     }
-    
-    // Create source milestone index
-    int agentMilestone = milestones.size()-2;
-    // Create goal milestone index
-    int goalMilestone = milestones.size()-1;
-    
-    // Perform search algorithm
-    dijkstraResult djikstraR = dijkstra(milestones, paths, milestones.get(agentMilestone));
-    
-    ArrayList<Milestone> agentPath = new ArrayList<Milestone>();
-    agentPath.add(milestones.get(goalMilestone));
-    
-    Milestone pathTile = milestones.get(agentMilestone);
-    if (djikstraR.prev[goalMilestone] != null) {
-      pathTile = djikstraR.prev[goalMilestone];
-    }
-    while (pathTile != null) {
-      agentPath.add(pathTile);
-      pathTile = pathTile.getPrev();
-    }
-    Collections.reverse(agentPath);
-    return agentPath;
-  }
-  
-  ArrayList<Milestone> WolfPRM(Wolf agent) {
-    
-    ArrayList<Milestone> milestones = new ArrayList<Milestone>();
+    ArrayList<Milestone> milestones = new ArrayList<Milestone>(PRM_Map);
     ArrayList<Edge> paths = new ArrayList<Edge>();
-    
-    // Sample random points
-    for (int i = 0; i < numberOfSampledPoints; i++) {
-      // Randomly sample configurations
-      float randomX =  random(center.x - size * 0.5, center.x + size * 0.5);
-      float randomZ =  random(center.z - size * 0.5, center.z + size * 0.5);
-      milestones.add(new Milestone(randomX, randomZ, 0));
-    }
     
     // Create goal milestone
     for (int i = 0; i < chickens.size(); i++) {
@@ -1760,11 +1853,36 @@ class Game {
         dist += abs((milestones.get(j).getPos().z - milestones.get(i).getPos().z));
         if (dist < edgeMaxDistance && dist > 0) {
           boolean addEdge = true;
+          // Check for edge collision with obstacles
           for (int k = 0; k < obstacles.size(); k++) {
             Vector2D pointA = milestones.get(i).getPos();
             Vector2D pointB = milestones.get(j).getPos();
             Vector2D xBound = obstacles.get(k).getXBound();
             Vector2D zBound = obstacles.get(k).getZBound();
+            Vector2D endPointA = new Vector2D(xBound.x - 10, zBound.x + 10);
+            Vector2D endPointB = new Vector2D(xBound.z - 10, zBound.x + 10);
+            Vector2D endPointC = new Vector2D(xBound.z - 10, zBound.z + 10);
+            Vector2D endPointD = new Vector2D(xBound.x - 10, zBound.z + 10);
+            
+            if (linesIntersect(pointA, pointB, endPointA, endPointB)) {
+              addEdge = false;
+            }
+            if (linesIntersect(pointA, pointB, endPointB, endPointC)) {
+              addEdge = false;
+            }
+            if (linesIntersect(pointA, pointB, endPointC, endPointD)) {
+              addEdge = false;
+            }
+            if (linesIntersect(pointA, pointB, endPointD, endPointA)) {
+              addEdge = false;
+            }
+          }
+          // Check for edge collision with chicken pens
+          for (int k = 0; k < chickenPens.size(); k++) {
+            Vector2D pointA = milestones.get(i).getPos();
+            Vector2D pointB = milestones.get(j).getPos();
+            Vector2D xBound = chickenPens.get(k).getXBound();
+            Vector2D zBound = chickenPens.get(k).getZBound();
             Vector2D endPointA = new Vector2D(xBound.x - 10, zBound.x + 10);
             Vector2D endPointB = new Vector2D(xBound.z - 10, zBound.x + 10);
             Vector2D endPointC = new Vector2D(xBound.z - 10, zBound.z + 10);
