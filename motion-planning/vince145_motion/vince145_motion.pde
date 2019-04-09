@@ -1,8 +1,10 @@
-// vince145_PRM_motionPlanning by Matthew Vincent, vince145
+// vince145_PRM_motion by Matthew Vincent, vince145
 // for CSCI 5611 at the University of Minnesota Twin Cities
 //
 //
-//
+// PeasyCam 3D user interactive camera library is used.
+// The PeasyCam library was made by Jonathan Feinberg
+// http://mrfeinberg.com/peasycam/
 //
 // Ray - Sphere intersection code modified from
 // http://kylehalladay.com/blog/tutorial/math/2013/12/24/Ray-Sphere-Intersection.html
@@ -36,7 +38,7 @@ boolean gameOver = false;
 boolean placedObject = false;
 float gameSize = 1500;
 float edgeMaxDistance = gameSize/2; // boardSize/10
-int numberOfSampledPoints = 20;
+int numberOfSampledPoints = 35;
 int inputDelay = 5;
 
 float w = 800;
@@ -49,7 +51,7 @@ void setup() {
   size(1600, 900, P3D);
   fill(255);
   cam = new PeasyCam(this, 500);
-  cam.setMinimumDistance(500);
+  cam.setMinimumDistance(250);
   cam.setMaximumDistance(1500);
   textSize(32);
 }
@@ -711,23 +713,23 @@ class SetupAgent {
               stroke(0,0,0);
               // right wall
               pushMatrix();
-              translate(pos.x + w * 0.5 - 2.5, (-h * 0.5) - 0.15, pos.z);
-              box(5, h, b);
+              translate(pos.x + w * 0.5 - 2.5, (-40.0 * 0.5) - 0.15, pos.z);
+              box(5, 40, b);
               popMatrix();
               // left wall
               pushMatrix();
-              translate(pos.x - w * 0.5 + 2.5, (-h * 0.5) - 0.15, pos.z);
-              box(5, h, b);
+              translate(pos.x - w * 0.5 + 2.5, (-40.0 * 0.5) - 0.15, pos.z);
+              box(5, 40, b);
               popMatrix();
               // front wall
               pushMatrix();
-              translate(pos.x, (-h * 0.5) - 0.15, pos.z + b * 0.5 - 2.5);
-              box(w, h, 5);
+              translate(pos.x, (-40.0 * 0.5) - 0.15, pos.z + b * 0.5 - 2.5);
+              box(w, 40, 5);
               popMatrix();
               // back wall
               pushMatrix();
-              translate(pos.x, (-h * 0.5) - 0.15, pos.z - b * 0.5 + 2.5);
-              box(w, h, 5);
+              translate(pos.x, (-40.0 * 0.5) - 0.15, pos.z - b * 0.5 + 2.5);
+              box(w, 40, 5);
               popMatrix();
               break;
     }
@@ -1310,10 +1312,11 @@ class Game {
       obstacles.add(new Obstacle(this.center.x, this.center.z - 100, 300, 200, 5)); // back wall
       obstacles.add(new Obstacle(this.center.x + (150-75*0.5), this.center.z + 100, 75, 200, 5)); // right doorway wall
       obstacles.add(new Obstacle(this.center.x - (150-75*0.5), this.center.z + 100, 75, 200, 5)); // left doorway wall
+      
+      // Set ChickenPen
+      chickenPens.add(new ChickenPen(this.center.x, this.center.z, 300, 40, 200));
     }
     
-    // Set ChickenPen
-    chickenPens.add(new ChickenPen(this.center.x, this.center.z, 300, 40, 200)); // right wall
     
     // Setup SetupAgent
     setupAgent = new SetupAgent(this.center.x, this.center.z + 30);
@@ -1402,7 +1405,7 @@ class Game {
       switch(setupAgentState) {
         case 0: break;
         case 1: 
-                // Checks ot make sure chickens are not placed in obstacles
+                // Checks to make sure chickens are not placed in obstacles
                 for (int k = 0; k < obstacles.size(); k++) {
                   Vector2D xBound = obstacles.get(k).getXBound();
                   Vector2D zBound = obstacles.get(k).getZBound();
@@ -1477,7 +1480,7 @@ class Game {
         case 4: 
                 chickenPens.add(new ChickenPen(agentX, agentZ, 
                                            setupAgent.getW(), 
-                                           setupAgent.getH(), 
+                                           40, 
                                            setupAgent.getB()));
                 Vector2D xBound2 = chickenPens.get(chickenPens.size()-1).getXBound();
                 Vector2D zBound2 = chickenPens.get(chickenPens.size()-1).getZBound();
@@ -1833,6 +1836,8 @@ class Game {
         }
         if (validMilestone) {
           PRM_Map.add(new Milestone(randomX, randomZ, 0));
+        } else {
+          i--;
         }
       }
     }
@@ -1883,6 +1888,32 @@ class Game {
             Vector2D pointB = milestones.get(j).getPos();
             Vector2D xBound = chickenPens.get(k).getXBound();
             Vector2D zBound = chickenPens.get(k).getZBound();
+            Vector2D endPointA = new Vector2D(xBound.x - 10, zBound.x + 10);
+            Vector2D endPointB = new Vector2D(xBound.z - 10, zBound.x + 10);
+            Vector2D endPointC = new Vector2D(xBound.z - 10, zBound.z + 10);
+            Vector2D endPointD = new Vector2D(xBound.x - 10, zBound.z + 10);
+            
+            if (linesIntersect(pointA, pointB, endPointA, endPointB)) {
+              addEdge = false;
+            }
+            if (linesIntersect(pointA, pointB, endPointB, endPointC)) {
+              addEdge = false;
+            }
+            if (linesIntersect(pointA, pointB, endPointC, endPointD)) {
+              addEdge = false;
+            }
+            if (linesIntersect(pointA, pointB, endPointD, endPointA)) {
+              addEdge = false;
+            }
+          }
+          
+          // Check for edge collision with player
+          for (int k = 0; k < 1; k++) {
+            Vector2D pointA = milestones.get(i).getPos();
+            Vector2D pointB = milestones.get(j).getPos();
+            Vector2D userPos = user.getPos();
+            Vector2D xBound = new Vector2D(userPos.x - 20, userPos.x + 20);
+            Vector2D zBound = new Vector2D(userPos.z - 20, userPos.z + 20);
             Vector2D endPointA = new Vector2D(xBound.x - 10, zBound.x + 10);
             Vector2D endPointB = new Vector2D(xBound.z - 10, zBound.x + 10);
             Vector2D endPointC = new Vector2D(xBound.z - 10, zBound.z + 10);
