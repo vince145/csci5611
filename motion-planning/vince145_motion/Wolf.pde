@@ -63,24 +63,7 @@ class Wolf {
       } 
     }
     
-    float velMin = 0.1;
-    if (vel.x > 0 && vel.z < velMin && vel.z > -1.0*velMin) {
-      rotation = -PI/2;
-    } else if (vel.x < 0 && vel.z < velMin && vel.z > -1.0*velMin) {
-      rotation = PI/2;
-    } else if (vel.x < velMin && vel.x > -1.0*velMin && vel.z > 0) {
-      rotation = PI;
-    } else if (vel.x < velMin && vel.x > -1.0*velMin && vel.z < 0) {
-      rotation = 0;
-    } else if (vel.x > 0 && vel.z > 0) {
-      rotation = atan(vel.z/(vel.x + 0.0000001)) + PI;
-    } else if (vel.x > 0 && vel.z < 0) {
-      rotation = atan(vel.z/(vel.x + 0.0000001));
-    } else if (vel.x < 0 && vel.z > 0) {
-      rotation = atan(vel.z/(vel.x + 0.0000001)) + PI;
-    } else if (vel.x < 0 && vel.z < 0) {
-      rotation = atan(vel.z/(vel.x + 0.0000001)) + 2*PI;
-    }
+  rotation = atan2(vel.x,vel.z);
     
   }
   
@@ -88,7 +71,7 @@ class Wolf {
     pushMatrix();
     noStroke();
     translate(this.pos.x,0,this.pos.z);
-    rotateY(rotation);
+    rotateY(rotation + PI);
     fill(255,0,0); // white
     translate(0, -12.5, 0);
     box(7.5,10,13.5); // body
